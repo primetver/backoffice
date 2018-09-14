@@ -22,7 +22,7 @@ class Salary(md.Model):
     Оклад
     '''
     employee = md.ForeignKey(Employee, on_delete=md.CASCADE)
-    amount = md.IntegerField('Оклад', default=0)
+    amount = md.IntegerField('Оклад')
     start_date = md.DateField('Дата изменения')
     
 class Project(md.Model):
