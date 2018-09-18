@@ -18,11 +18,13 @@ class Employee(md.Model):
     hire_date = md.DateField('Дата приема на работу')
     # если fire_date == None -- значит сейчас работает
     fire_date = md.DateField('Дата увольнения', null=True, blank=True, default=None)
-    is_fulltime = md.BooleanField('Работает полный день?', default=True)
+    is_3d = md.BooleanField('Участник системы 3D ?', default=False)
     business_k = md.FloatField('Коэффициент участия в бизнесе', default=0.5)
 
     def full_name(self):
         return f'{self.last_name} {self.first_name} {self.sur_name}'.rstrip()
+    full_name.admin_order_field = 'last_name'
+    full_name.short_description = 'ФИО'
 
     def salary(self):
         try:
@@ -30,6 +32,7 @@ class Employee(md.Model):
         except Salary.DoesNotExist:             # pylint: disable=no-member
             s = None
         return s
+    salary.short_description = 'Текущий оклад'
 
     def info(self):
         return f'{self.full_name()} ({self.id}), дата приема: {self.hire_date}, оклад: {self.salary()}'  # pylint: disable=no-member
@@ -54,8 +57,22 @@ class Salary(md.Model):
     start_date = md.DateField('Дата изменения')
 
     def __str__(self):
-        return f'{self.employee.full_name()}, оклад: {self.amount} р., изменен {self.start_date}'
+        return f'{self.employee.full_name()}, оклад: {self.amount} р., изменен {self.start_date:%d.%m.%Y}'
 
+
+class Business(md.Model):
+    '''
+    Бизнес
+    '''
+    class Meta():
+        verbose_name = 'бизнес'
+        verbose_name_plural = 'бизнесы'
+
+    name = md.CharField('Название', max_length=20, unique=True)
+    lead = md.CharField('Руководитель', max_length=200)
+
+    def __str__(self):
+        return self.name
 
 class Project(md.Model):
     '''
@@ -66,6 +83,7 @@ class Project(md.Model):
         verbose_name_plural = 'проекты'
         get_latest_by = 'start_date'
         ordering = ('start_date', 'short_name')
+        unique_together = (('business', 'short_name'),)
 
     # Статусы проекта
     INITIAL = "IN"
@@ -91,11 +109,9 @@ class Project(md.Model):
         (BUDGET_APPROVED, 'Бюджет утвержден')
     )
 
-    business = md.CharField('Бизнес', max_length=20)
-    short_name = md.CharField('Сокращенное название', max_length=40, primary_key=True)
-    full_name = md.CharField('Полное название', max_length=200)
-    head = md.ForeignKey(Employee, on_delete=md.SET_DEFAULT, blank=True, default=None, 
-                         verbose_name='Руководитель')
+    business = md.ForeignKey(Business, on_delete=md.CASCADE, verbose_name='Бизнес')
+    short_name = md.CharField('Сокращенное название', max_length=40)
+    full_name = md.TextField('Полное название')
     start_date = md.DateField('Дата начала')
     # если None -- значит проект сейчас исполняется
     finish_date = md.DateField('Дата окончания', blank=True, default=None)
@@ -104,22 +120,70 @@ class Project(md.Model):
     budget_state = md.CharField('Состояние бюджета', max_length=2, 
                                 default=BUDGET_NONE, choices=BUDGET_STATE_CHOICES)
 
+    def lead(self):
+        try:
+            s = self.projectmember_set.get(role__is_lead=True).employee.full_name()    # pylint: disable=no-member
+        except ProjectMember.DoesNotExist:                  # pylint: disable=no-member
+            s = 'Не указан'
+        except ProjectMember.MultipleObjectsReturned:       # pylint: disable=no-member
+            s = 'Несколько руководителей?'
+        return s
+    lead.short_description = 'Руководитель'
+
+    def member_count(self):
+        return self.projectmember_set.count()               # pylint: disable=no-member
+    member_count.short_description = 'Число участников'
+
+    def __str__(self):
+        return f'{self.business}, {self.short_name}'
+    __str__.admin_order_field = 'short_name'
+    __str__.short_description = 'Проект'
+
 
 class Role(md.Model):
     '''
     Проектная роль
     '''
+    class Meta():
+        verbose_name = 'проектная роль'
+        verbose_name_plural = 'проектные роли'
 
-class Workgroup(md.Model):
+    role = md.CharField('Роль', max_length=40, unique=True)
+    descr = md.TextField('Описание роли', blank=True)
+    is_lead = md.BooleanField('Руководитель проекта?', default=False)
+
+    def __str__(self):
+        return self.role
+
+class ProjectMember(md.Model):
     '''
-    Рабочая группа проекта
+    Участник проекта
     '''
+    class Meta():
+        verbose_name = 'участник проекта'
+        verbose_name_plural = 'участники проекта'
+        ordering = ('project', 'employee')
+        unique_together = (('project', 'employee'),)
+
+    project = md.ForeignKey(Project, on_delete=md.CASCADE, verbose_name='Проект')
+    employee = md.ForeignKey(Employee, on_delete=md.CASCADE, verbose_name='Сотрудник')
+    role = md.ForeignKey(Role, on_delete=md.PROTECT, verbose_name='Роль в проекте')
+    start_date = md.DateField('Дата включения в рабочую группу')
+
+    def __str__(self):
+        return f'{self.project}, {self.employee}, {self.role}'
 
 
 class Booking(md.Model):
     ''' 
-    Загрузка сотрудников в проектах
+    Загрузка участника в месяце
     '''
+    class Meta():
+        verbose_name = 'загрузка участника'
+        verbose_name_plural = 'загрузка участников'
+        ordering = ('project_member', 'month')
+        unique_together = (('project_member', 'month', 'state'),)
+
     # Статусы версии
     DRAFT = 'DR'
     PLAN = 'PL'
@@ -131,11 +195,12 @@ class Booking(md.Model):
         (FACT, 'Фактическое участие')
     )
 
-    member = md.ForeignKey(Employee, on_delete=md.CASCADE)
-    project = md.ForeignKey(Project, on_delete=md.CASCADE)
-    month = md.DateField('Месяц загрузки')  # число месяца игнорируется
-    # от 0 до 1 и более (1 = 100% -- полная загрузка)
-    load = md.FloatField('Коэффициент загрузки')
+    project_member = md.ForeignKey(ProjectMember, on_delete=md.CASCADE, verbose_name='Участник проекта')
+    month = md.DateField('Месяц загрузки')          # число месяца игнорируется
+    load = md.FloatField('Процент загрузки', default=100)    # от 0 до 100 и более (100% -- полная загрузка)
     #version = md.IntegerField('Версия корректировки')
     state = md.CharField('Статус данных о загрузке', max_length=2,
                          default=DRAFT, choices=BOOKING_STATE_CHOICES)
+
+    def __str__(self):
+        return f'{self.project_member}, загрузка {self.month:%m.%Y} составляет {self.load}%'
