@@ -25,7 +25,7 @@ SECRET_KEY = '**ou5icb&$_lwpltpf&g80bvkbe50xqma98d@du8d!^3elq#0u'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['ishiev','localhost']
 
 
 # Application definition

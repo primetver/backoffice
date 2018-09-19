@@ -1,5 +1,13 @@
 from django.contrib import admin
-from .models import Employee, Salary, Business, Project, Role, ProjectMember, Booking
+from .models import Division, Employee, Salary, Business, Project, Role, ProjectMember, Booking
+
+
+@admin.register(Division)
+class DivisionAdmin(admin.ModelAdmin):
+    '''
+    Справочник подразделений
+    '''
+    list_display = ('name', 'full_name', 'head')
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
@@ -12,7 +20,7 @@ class EmployeeAdmin(admin.ModelAdmin):
 
     inlines = [SalaryInline]
     list_display = ('full_name', 'salary', 'hire_date', 'fire_date', 'is_3d')
-    list_filter = ('hire_date', 'is_3d')
+    list_filter = ('division', 'hire_date', 'is_3d', 'fire_date')
 
 
 @admin.register(Project)
@@ -23,6 +31,7 @@ class ProjectAdmin(admin.ModelAdmin):
     class ProjectMemberInline(admin.TabularInline):
         model = ProjectMember
         extra = 1
+        #verbose_name = ''
 
     inlines = [ProjectMemberInline]
     list_display = ('__str__', 'lead', 'member_count','start_date', 'finish_date', 'state')

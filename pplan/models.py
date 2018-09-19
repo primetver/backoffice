@@ -2,6 +2,23 @@ from django.db import models as md              # pylint: disable=no-member
 
 # Create your models here.
 
+class Division(md.Model):
+    '''
+    Подразделение
+    '''
+    class Meta():
+        verbose_name = 'подразделение'
+        verbose_name_plural = 'подразделения'
+        ordering = ('name',)
+
+    name = md.CharField('Подразделение', max_length=40, unique=True)
+    full_name = md.TextField('Полное название')
+    head = md.OneToOneField('Employee', null=True, blank=True, on_delete=md.SET_NULL,
+        verbose_name='Руководитель', related_name='subordinate')
+
+    def __str__(self):
+        return self.name
+
 
 class Employee(md.Model):
     '''
@@ -15,6 +32,7 @@ class Employee(md.Model):
     last_name = md.CharField('Фамилия', max_length=200, db_index=True)
     first_name = md.CharField('Имя', max_length=200)
     sur_name = md.CharField('Отчество', max_length=200, blank=True)
+    division = md.ForeignKey(Division, null=True, on_delete=md.PROTECT, verbose_name='Подразделение')
     hire_date = md.DateField('Дата приема на работу')
     # если fire_date == None -- значит сейчас работает
     fire_date = md.DateField('Дата увольнения', null=True, blank=True, default=None)
