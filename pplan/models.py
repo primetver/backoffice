@@ -1,4 +1,5 @@
 from django.db import models as md              # pylint: disable=no-member
+from phonenumber_field.modelfields import PhoneNumberField
 
 # Create your models here.
 
@@ -9,15 +10,56 @@ class Division(md.Model):
     class Meta():
         verbose_name = 'подразделение'
         verbose_name_plural = 'подразделения'
-        ordering = ('name',)
 
     name = md.CharField('Подразделение', max_length=40, unique=True)
     full_name = md.TextField('Полное название')
     head = md.OneToOneField('Employee', null=True, blank=True, on_delete=md.SET_NULL,
         verbose_name='Руководитель', related_name='subordinate')
 
+    def occupied(self):
+        return self.position_set.employee_set.count()    # pylint: disable=no-member
+    occupied.short_description = 'Число сотрудников'
+
     def __str__(self):
         return self.name
+
+class PositionName(md.Model):
+    '''
+    Наименование должности (без привязки к подразделениям)
+    '''
+    class Meta():
+        verbose_name = 'наименование должности'
+        verbose_name_plural = 'наименования должностей'
+
+    name = md.CharField('Наименование должности', max_length=200)
+
+    def occupied(self):
+        return self.position_set.employee_set.count()    # pylint: disable=no-member
+    occupied.short_description = 'Число сотрудников'
+    
+    def __str__(self):
+        return self.name
+
+
+class Position(md.Model):
+    '''
+    Должность в подразделении
+    '''
+    class Meta():
+        verbose_name = 'должность'
+        verbose_name_plural = 'должности'
+        unique_together = (('position_name', 'division'),)
+        ordering = ('division', 'position_name')
+
+    position_name = md.ForeignKey(PositionName, null=True, on_delete=md.PROTECT, verbose_name='Должность')
+    division = md.ForeignKey(Division, on_delete=md.CASCADE, verbose_name='Подразделение')
+
+    def occupied(self):
+        return self.employee_set.count()    # pylint: disable=no-member
+    occupied.short_description = 'Число сотрудников'
+
+    def __str__(self):
+        return f'{self.division}, {self.name.lower()}'
 
 
 class Employee(md.Model):
@@ -32,12 +74,16 @@ class Employee(md.Model):
     last_name = md.CharField('Фамилия', max_length=200, db_index=True)
     first_name = md.CharField('Имя', max_length=200)
     sur_name = md.CharField('Отчество', max_length=200, blank=True)
-    division = md.ForeignKey(Division, null=True, on_delete=md.PROTECT, verbose_name='Подразделение')
+    position = md.ForeignKey(Position, null=True, on_delete=md.PROTECT, verbose_name='Должность')   
     hire_date = md.DateField('Дата приема на работу')
     # если fire_date == None -- значит сейчас работает
     fire_date = md.DateField('Дата увольнения', null=True, blank=True, default=None)
     is_3d = md.BooleanField('Участник системы 3D ?', default=False)
     business_k = md.FloatField('Коэффициент участия в бизнесе', default=0.5)
+    birthday = md.DateField('День рождения', null=True, blank=True, default=None)
+    local_phone = md.CharField('Внутренний номер', max_length=10, blank=True)
+    work_phone = PhoneNumberField('Телефон корпоративный', blank=True)
+    mobile_phone = PhoneNumberField('Телефон мобильный', blank=True)
 
     def full_name(self):
         return f'{self.last_name} {self.first_name} {self.sur_name}'.rstrip()
@@ -75,7 +121,7 @@ class Salary(md.Model):
     start_date = md.DateField('Дата изменения')
 
     def __str__(self):
-        return f'{self.employee.full_name()}, оклад: {self.amount} р., изменен {self.start_date:%d.%m.%Y}'
+        return f'{self.employee}, оклад: {self.amount} р., изменен {self.start_date:%d.%m.%Y}'
 
 
 class Business(md.Model):
@@ -109,7 +155,7 @@ class Project(md.Model):
     CLOSING = 'CL'
     CLOSED = 'CD'
     # Выбор статусов
-    PLOJECT_STATE_CHOICES = (
+    PROJECT_STATE_CHOICES = (
         (INITIAL, 'Проект планируется'),
         (OPENED, 'Проект открыт'),
         (CLOSING, 'Проект в стадии закрытия'),
@@ -134,7 +180,7 @@ class Project(md.Model):
     # если None -- значит проект сейчас исполняется
     finish_date = md.DateField('Дата окончания', blank=True, default=None)
     state = md.CharField('Статус проекта', max_length=2, 
-                                default=INITIAL, choices=PLOJECT_STATE_CHOICES)
+                                default=INITIAL, choices=PROJECT_STATE_CHOICES)
     budget_state = md.CharField('Состояние бюджета', max_length=2, 
                                 default=BUDGET_NONE, choices=BUDGET_STATE_CHOICES)
 
