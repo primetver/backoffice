@@ -2,25 +2,37 @@ from django.contrib import admin
 from .models import Division, PositionName, Position, Employee, Salary, Business, Project, Role, ProjectMember, Booking
 
 
-class PositionInline(admin.TabularInline):
-    model = Position
-    extra = 1
+admin.AdminSite.site_header = 'Тверской филиал'
 
 @admin.register(Division)
 class DivisionAdmin(admin.ModelAdmin):
     '''
     Справочник подразделений
     '''
+    class PositionInline(admin.TabularInline):
+        model = Position
+        extra = 1
+
     inlines = [PositionInline]
     list_display = ('name', 'full_name', 'head', 'occupied')
+
 
 @admin.register(PositionName)
 class PositionNameAdmin(admin.ModelAdmin):
     '''
     Справочник наименований должностей
     '''
-    inlines = [PositionInline]
     list_display = ('name', 'occupied')
+
+
+@admin.register(Position)
+class PositionAdmin(admin.ModelAdmin):
+    '''
+    Администрирование должностей с привязкой к отделам
+    '''
+    list_display = ('division', 'position_name', 'occupied')
+    list_filter = ('division__name', 'position_name')
+
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):

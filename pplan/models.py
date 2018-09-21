@@ -1,6 +1,8 @@
 from django.db import models as md              # pylint: disable=no-member
 from phonenumber_field.modelfields import PhoneNumberField
 
+import timeit
+
 # Create your models here.
 
 class Division(md.Model):
@@ -10,14 +12,15 @@ class Division(md.Model):
     class Meta():
         verbose_name = 'подразделение'
         verbose_name_plural = 'подразделения'
-
+        ordering = ('name',)
+        
     name = md.CharField('Подразделение', max_length=40, unique=True)
     full_name = md.TextField('Полное название')
     head = md.OneToOneField('Employee', null=True, blank=True, on_delete=md.SET_NULL,
         verbose_name='Руководитель', related_name='subordinate')
 
     def occupied(self):
-        return self.position_set.employee_set.count()    # pylint: disable=no-member
+        return Employee.objects.filter(position__division__id=self.id).count()  # pylint: disable=no-member
     occupied.short_description = 'Число сотрудников'
 
     def __str__(self):
@@ -30,13 +33,15 @@ class PositionName(md.Model):
     class Meta():
         verbose_name = 'наименование должности'
         verbose_name_plural = 'наименования должностей'
+        ordering = ('name',)
 
-    name = md.CharField('Наименование должности', max_length=200)
+    name = md.CharField('Наименование должности', max_length=200, unique=True)
 
     def occupied(self):
-        return self.position_set.employee_set.count()    # pylint: disable=no-member
+        return Employee.objects.filter(position__position_name__id=self.id).count() # pylint: disable=no-member
+        # return sum(p.occupied() for p in self.position_set.all())   -- more slowly!
     occupied.short_description = 'Число сотрудников'
-    
+
     def __str__(self):
         return self.name
 
@@ -51,15 +56,15 @@ class Position(md.Model):
         unique_together = (('position_name', 'division'),)
         ordering = ('division', 'position_name')
 
-    position_name = md.ForeignKey(PositionName, null=True, on_delete=md.PROTECT, verbose_name='Должность')
     division = md.ForeignKey(Division, on_delete=md.CASCADE, verbose_name='Подразделение')
+    position_name = md.ForeignKey(PositionName, on_delete=md.PROTECT, verbose_name='Должность')
 
     def occupied(self):
         return self.employee_set.count()    # pylint: disable=no-member
     occupied.short_description = 'Число сотрудников'
 
     def __str__(self):
-        return f'{self.division}, {self.name.lower()}'
+        return f'{self.division}, {str(self.position_name).lower()}'
 
 
 class Employee(md.Model):
