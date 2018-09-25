@@ -1,8 +1,8 @@
-from django.db import models as md              # pylint: disable=no-member
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
+from django.db import models as md  # pylint: disable=no-member
+from django.utils import timezone
 from phonenumber_field.modelfields import PhoneNumberField
-
-import timeit
 
 # Create your models here.
 
@@ -21,9 +21,9 @@ class Division(md.Model):
         verbose_name='Руководитель', related_name='subordinate')
 
     def occupied(self):
-        return self.employee_set.count()    # pylint: disable=no-member
+        return self.employee_set.exclude(fire_date__lt=timezone.now().date()).count()   # pylint: disable=no-member
         #return Employee.objects.filter(position__division__id=self.id).count()  # pylint: disable=no-member
-    occupied.short_description = 'Число сотрудников'
+    occupied.short_description = 'Работает сотрудников'
 
     def __str__(self):
         return self.name
@@ -40,10 +40,10 @@ class Position(md.Model):
     name = md.CharField('Наименование должности', max_length=200, unique=True)
 
     def occupied(self):
-        return self.employee_set.count()    # pylint: disable=no-member
-        # return Employee.objects.filter(position__position_name__id=self.id).count() # pylint: disable=no-member
+        return self.employee_set.exclude(fire_date__lt=timezone.now().date()).count()   # pylint: disable=no-member
+        # return Employee.objects.filter(position__position_name__id=self.id).count()   # pylint: disable=no-member
         # return sum(p.occupied() for p in self.position_set.all())   -- more slowly!
-    occupied.short_description = 'Число сотрудников'
+    occupied.short_description = 'Работает сотрудников'
 
     def __str__(self):
         return self.name
@@ -61,11 +61,16 @@ class StaffingTable(md.Model):
 
     division = md.ForeignKey(Division, on_delete=md.CASCADE, verbose_name='Подразделение')
     position = md.ForeignKey(Position, on_delete=md.PROTECT, verbose_name='Должность')
-    count = md.IntegerField('Число позиций', default=1)       
+    count = md.IntegerField('Число позиций', default=1, validators=[MinValueValidator(0)])       
 
     def occupied(self):
-        return Employee.objects.filter(division__name=self.division, position__name=self.position).count()  # pylint: disable=no-member
-    occupied.short_description = 'Число сотрудников'
+        return Employee.objects.filter(division__name=self.division,            # pylint: disable=no-member
+            position__name=self.position).exclude(fire_date__lt=timezone.now().date()).count()
+    occupied.short_description = 'Работает сотрудников'
+
+    def vacant(self):
+        return self.count - self.occupied()
+    vacant.short_description = 'Вакансий'
 
     def __str__(self):
         return f'{self.division.name}, {str(self.position.name).lower()}'
@@ -84,7 +89,7 @@ class Employee(md.Model):
     first_name = md.CharField('Имя', max_length=200)
     sur_name = md.CharField('Отчество', max_length=200, blank=True)
     division = md.ForeignKey(Division, null=True, on_delete=md.CASCADE, verbose_name='Подразделение')  
-    position = md.ForeignKey(Position, null=True, on_delete=md.PROTECT, verbose_name='Должность')
+    position = md.ForeignKey(Position, null=True, on_delete=md.PROTECT, verbose_name='Занимаемая должность')
     hire_date = md.DateField('Дата приема на работу')
     # если fire_date == None -- значит сейчас работает
     fire_date = md.DateField('Дата увольнения', null=True, blank=True, default=None)
@@ -108,6 +113,9 @@ class Employee(md.Model):
         return s
     salary.short_description = 'Текущий оклад'
 
+    def if_fired(self):
+        return self.fire_date < timezone.now().date()
+
     def info(self):
         return f'{self.full_name()} ({self.id}), дата приема: {self.hire_date}, оклад: {self.salary()}'  # pylint: disable=no-member
 
@@ -115,11 +123,19 @@ class Employee(md.Model):
         return self.full_name()
 
     def clean(self):
+        # validation against staffing table 
         if self.position is None or self.division is None:
             return
-        if StaffingTable.objects.filter(division=self.division, position=self.position).count() == 0:   # pylint: disable=no-member
+        try:
+            table_position = StaffingTable.objects.get(division=self.division, position=self.position)  # pylint: disable=no-member
+            # vacant positions + employee already in the same position > 0
+            if table_position.vacant() + Employee.objects.filter(                                       # pylint: disable=no-member
+                id=self.id, division=self.division, position=self.position).count() > 0:                # pylint: disable=no-member
+                return
+            raise ValidationError(f'Для подразделения {self.division} все должности {self.position} уже заняты в штатном расписании.')
+        except StaffingTable.DoesNotExist:  # pylint: disable=no-member
             raise ValidationError(f'Для подразделения {self.division} нет должности {self.position} в штатном расписании.')
-
+        
 
 class Salary(md.Model):
     '''
@@ -190,7 +206,7 @@ class Project(md.Model):
     )
 
     business = md.ForeignKey(Business, on_delete=md.CASCADE, verbose_name='Бизнес')
-    short_name = md.CharField('Сокращенное название', max_length=40)
+    short_name = md.CharField('Сокращенное название', max_length=40, db_index=True)
     full_name = md.TextField('Полное название')
     start_date = md.DateField('Дата начала')
     # если None -- значит проект сейчас исполняется

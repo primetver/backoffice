@@ -31,13 +31,13 @@ class StaffingTableAdmin(admin.ModelAdmin):
     '''
     Администрирование штатного расписания
     '''
-    list_display = ('division', 'position', 'count','occupied')
-    list_filter = ('division__name', 'position')
+    list_display = ('division', 'position', 'count', 'occupied', 'vacant')
+    list_filter = ('division__name', 'position__name')
 
 
 class ProjectMemberInline(admin.TabularInline):
     model = ProjectMember
-    extra = 1
+    extra = 0
     
 
 @admin.register(Employee)
@@ -47,11 +47,29 @@ class EmployeeAdmin(admin.ModelAdmin):
     '''
     class SalaryInline(admin.TabularInline):
         model = Salary
-        extra = 1
+        extra = 0
+
+    fieldsets = [
+        (None,               
+            {'fields': [
+                'last_name', 'first_name', 'sur_name',
+                ('division', 'position'),
+                'hire_date', 'fire_date',
+                ('is_3d', 'business_k')],
+            'classes': [],
+            }),
+        ('Дополнительные сведения'.upper(),
+            {'fields': [
+                'birthday',
+                ('local_phone', 'work_phone', 'mobile_phone')],
+            'classes': [
+                'collapse']
+            })
+    ]    
 
     inlines = [SalaryInline, ProjectMemberInline]
-    list_display = ('full_name', 'salary', 'hire_date', 'fire_date', 'is_3d')
-    list_filter = ('division__name', 'position__name', 'hire_date', 'is_3d', 'fire_date')
+    list_display = ('full_name', 'division', 'position', 'salary', 'hire_date', 'fire_date', 'is_3d')
+    list_filter = ('division__name', 'position__name', 'is_3d', 'hire_date', 'fire_date')
 
 
 @admin.register(Project)
