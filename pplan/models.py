@@ -1,6 +1,9 @@
+# pylint: disable=no-member
+import datetime
+
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
-from django.db import models as md  # pylint: disable=no-member
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models as md
 from django.utils import timezone
 from phonenumber_field.modelfields import PhoneNumberField
 
@@ -19,10 +22,11 @@ class Division(md.Model):
     full_name = md.TextField('Полное название')
     head = md.OneToOneField('Employee', null=True, blank=True, on_delete=md.SET_NULL,
         verbose_name='Руководитель', related_name='subordinate')
-
+    
+    # pylint: disable=no-member
     def occupied(self):
-        return self.employee_set.exclude(fire_date__lt=timezone.now().date()).count()   # pylint: disable=no-member
-        #return Employee.objects.filter(position__division__id=self.id).count()  # pylint: disable=no-member
+        return self.employee_set.exclude(fire_date__lt=timezone.now().date()).count()
+        #return Employee.objects.filter(position__division__id=self.id).count()
     occupied.short_description = 'Работает сотрудников'
 
     def __str__(self):
@@ -39,9 +43,10 @@ class Position(md.Model):
 
     name = md.CharField('Наименование должности', max_length=200, unique=True)
 
+    # pylint: disable=no-member
     def occupied(self):
-        return self.employee_set.exclude(fire_date__lt=timezone.now().date()).count()   # pylint: disable=no-member
-        # return Employee.objects.filter(position__position_name__id=self.id).count()   # pylint: disable=no-member
+        return self.employee_set.exclude(fire_date__lt=timezone.now().date()).count()
+        # return Employee.objects.filter(position__position_name__id=self.id).count()
         # return sum(p.occupied() for p in self.position_set.all())   -- more slowly!
     occupied.short_description = 'Работает сотрудников'
 
@@ -63,8 +68,9 @@ class StaffingTable(md.Model):
     position = md.ForeignKey(Position, on_delete=md.PROTECT, verbose_name='Должность')
     count = md.IntegerField('Число позиций', default=1, validators=[MinValueValidator(0)])       
 
+    # pylint: disable=no-member
     def occupied(self):
-        return Employee.objects.filter(division__name=self.division,            # pylint: disable=no-member
+        return Employee.objects.filter(division__name=self.division,
             position__name=self.position).exclude(fire_date__lt=timezone.now().date()).count()
     occupied.short_description = 'Работает сотрудников'
 
@@ -94,7 +100,8 @@ class Employee(md.Model):
     # если fire_date == None -- значит сейчас работает
     fire_date = md.DateField('Дата увольнения', null=True, blank=True, default=None)
     is_3d = md.BooleanField('Участник системы 3D ?', default=False)
-    business_k = md.FloatField('Коэффициент участия в бизнесе', default=0.5)
+    business_k = md.FloatField('Коэффициент участия в бизнесе', default=0.5, 
+        validators=[MinValueValidator(0), MaxValueValidator(1)])
     birthday = md.DateField('День рождения', null=True, blank=True, default=None)
     local_phone = md.CharField('Внутренний номер', max_length=10, blank=True)
     work_phone = PhoneNumberField('Телефон корпоративный', blank=True)
@@ -105,10 +112,11 @@ class Employee(md.Model):
     full_name.admin_order_field = 'last_name'
     full_name.short_description = 'ФИО'
 
+    # pylint: disable=no-member
     def salary(self):
         try:
-            s = self.salary_set.latest().amount # pylint: disable=no-member
-        except Salary.DoesNotExist:             # pylint: disable=no-member
+            s = self.salary_set.latest().amount 
+        except Salary.DoesNotExist: 
             s = None
         return s
     salary.short_description = 'Текущий оклад'
@@ -117,24 +125,48 @@ class Employee(md.Model):
         return self.fire_date < timezone.now().date()
 
     def info(self):
-        return f'{self.full_name()} ({self.id}), дата приема: {self.hire_date}, оклад: {self.salary()}'  # pylint: disable=no-member
+        return f'{self.full_name()} ({self.id}), дата приема: {self.hire_date}, оклад: {self.salary()}'
 
     def __str__(self):
         return self.full_name()
 
     def clean(self):
-        # validation against staffing table 
+        self._validate_position()
+        self._validate_fire_date()
+        self._validate_birthday()
+
+    def _validate_position(self):
         if self.position is None or self.division is None:
             return
         try:
-            table_position = StaffingTable.objects.get(division=self.division, position=self.position)  # pylint: disable=no-member
+            table_position = StaffingTable.objects.get(division=self.division, position=self.position) 
             # vacant positions + employee already in the same position > 0
-            if table_position.vacant() + Employee.objects.filter(                                       # pylint: disable=no-member
-                id=self.id, division=self.division, position=self.position).count() > 0:                # pylint: disable=no-member
+            if table_position.vacant() + Employee.objects.filter(
+                id=self.id, division=self.division, position=self.position).count() > 0:
                 return
             raise ValidationError(f'Для подразделения {self.division} все должности {self.position} уже заняты в штатном расписании.')
-        except StaffingTable.DoesNotExist:  # pylint: disable=no-member
+        except StaffingTable.DoesNotExist:
             raise ValidationError(f'Для подразделения {self.division} нет должности {self.position} в штатном расписании.')
+
+    def _validate_fire_date(self):
+        try:
+            if self.fire_date < self.hire_date:
+                raise ValidationError(f'Дата увольнения {self.fire_date:%d.%m.%Y} не может быть ранее \
+                даты приема на работу {self.hire_date:%d.%m.%Y}')
+        except TypeError: pass
+
+    def _validate_birthday(self):
+        try:
+            if self.birthday > self.fire_date:
+                raise ValidationError(f'Дата рождения {self.birthday:%d.%m.%Y} не может быть позднее \
+                даты увольнения {self.fire_date:%d.%m.%Y}')
+        except TypeError: pass
+        try:
+            if self.birthday > self.hire_date:
+                raise ValidationError(f'Дата рождения {self.birthday:%d.%m.%Y} не может быть позднее \
+                даты приема на работу {self.hire_date:%d.%m.%Y}, нельзя родиться на работе ;)')
+        except TypeError: pass
+
         
 
 class Salary(md.Model):
@@ -149,11 +181,23 @@ class Salary(md.Model):
         unique_together = (('employee', 'start_date'),)
 
     employee = md.ForeignKey(Employee, on_delete=md.CASCADE, verbose_name='Сотрудник')
-    amount = md.IntegerField('Оклад')
+    amount = md.IntegerField('Оклад', validators=[MinValueValidator(1)])
     start_date = md.DateField('Дата изменения')
 
     def __str__(self):
         return f'{self.employee}, оклад: {self.amount} р., изменен {self.start_date:%d.%m.%Y}'
+    
+    # pylint: disable=no-member
+    def clean(self):
+        # validate salary dates
+        if self.start_date < self.employee.hire_date:               
+            raise ValidationError(f'Дата изменения оклада {self.start_date:%d.%m.%Y} не может быть ранее даты \
+            приема на работу {self.employee.hire_date:%d.%m.%Y}.') 
+        try:
+            if self.start_date >= self.employee.fire_date:
+                raise ValidationError(f'Дата изменения оклада {self.start_date:%d.%m.%Y} не может совпадать или быть позднее даты \
+                увольнения {self.employee.fire_date:%d.%m.%Y}.')
+        except TypeError: pass
 
 
 class Business(md.Model):
@@ -216,18 +260,19 @@ class Project(md.Model):
     budget_state = md.CharField('Состояние бюджета', max_length=2, 
                                 default=BUDGET_NONE, choices=BUDGET_STATE_CHOICES)
 
+    # pylint: disable=no-member
     def lead(self):
         try:
-            s = self.projectmember_set.get(role__is_lead=True).employee.full_name()    # pylint: disable=no-member
-        except ProjectMember.DoesNotExist:                  # pylint: disable=no-member
+            s = self.projectmember_set.get(role__is_lead=True).employee.full_name() 
+        except ProjectMember.DoesNotExist:
             s = 'Не указан'
-        except ProjectMember.MultipleObjectsReturned:       # pylint: disable=no-member
+        except ProjectMember.MultipleObjectsReturned: 
             s = 'Несколько руководителей?'
         return s
     lead.short_description = 'Руководитель'
 
     def member_count(self):
-        return self.projectmember_set.count()               # pylint: disable=no-member
+        return self.projectmember_set.count()
     member_count.short_description = 'Число участников'
 
     def __str__(self):
@@ -264,23 +309,77 @@ class ProjectMember(md.Model):
     project = md.ForeignKey(Project, on_delete=md.CASCADE, verbose_name='Проект')
     employee = md.ForeignKey(Employee, on_delete=md.CASCADE, verbose_name='Сотрудник')
     role = md.ForeignKey(Role, on_delete=md.PROTECT, verbose_name='Роль в проекте')
-    start_date = md.DateField('Дата включения в рабочую группу')
+    
+    # pylint: disable=no-member
+    def start_date(self):
+        return self._start_date_for_state(Booking.PLAN)
+    start_date.short_description = 'Дата начала'
+
+    def finish_date(self):
+        return self._finish_date_for_state(Booking.PLAN)
+    finish_date.short_description = 'Дата окончания'
+
+    def volume(self):
+        return self._volume_for_state(Booking.PLAN)
+    volume.short_description = 'Объем, чел.дн'
+
+    def percent(self):
+        try:
+            return self.volume() / workdays(self.start_date(), self.finish_date()) * 100
+        except TypeError:
+            return 0
+    percent.short_description = 'Загрузка, %'
 
     def __str__(self):
-        return f'{self.project}, {self.employee}, {self.role}'
+        return f'{self.project}, {self.employee}, {self.role} с {self.start_date():%d.%m.%Y} по {self.finish_date():%d.%m.%Y}, \
+            объем {self.volume()} чел.дн., {self.percent()}%'
+
+    def _start_date_for_state(self, state):
+        try:
+            s = Booking.objects.filter(project_member=self, state=state).order_by('start_date')[0].start_date
+        except IndexError:
+            s = None
+        return s
+
+    def _finish_date_for_state(self, state):
+        try:
+            s = Booking.objects.filter(project_member=self, state=state).order_by('-finish_date')[0].finish_date
+        except IndexError:
+            s = None
+        return s
+
+    def _volume_for_state(self, state):
+        booking = Booking.objects.filter(project_member=self, state=state)
+        return sum(volume(workdays(b.start_date, b.finish_date), b.load) for b in booking)
+        
+
+# Вспомогательные функции
+
+def today():
+    return timezone.now().date()
+
+def tomorrow():
+    return today() + datetime.timedelta(days=1)
+
+# Число рабочих дней без учета праздников, список выходных задается третьим параметром (понедельник = 0)
+def workdays(fromdate, todate, weekend=(5,6)):
+    daygenerator = (fromdate + datetime.timedelta(x) for x in range((todate - fromdate).days + 1))
+    return sum(1 for day in daygenerator if day.weekday() not in weekend)
+
+def volume(workdays, load):
+    return workdays * load / 100
 
 
 class Booking(md.Model):
     ''' 
-    Загрузка участника в месяце
+    Загрузка участника проекта
     '''
     class Meta():
         verbose_name = 'данные загрузки'
         verbose_name_plural = 'данные загрузки'
-        ordering = ('project_member', 'month')
-        unique_together = (('project_member', 'month', 'state'),)
+        ordering = ('project_member', 'start_date')
 
-    # Статусы версии
+    # Статусы
     DRAFT = 'DR'
     PLAN = 'PL'
     FACT = 'FA'
@@ -292,11 +391,13 @@ class Booking(md.Model):
     )
 
     project_member = md.ForeignKey(ProjectMember, on_delete=md.CASCADE, verbose_name='Участник проекта')
-    month = md.DateField('Месяц загрузки')          # число месяца игнорируется
+    start_date = md.DateField('Начало загрузки', default=today)             
+    finish_date = md.DateField('Окончание загрузки', default=tomorrow)
     load = md.FloatField('Процент загрузки', default=100)    # от 0 до 100 и более (100% -- полная загрузка)
-    #version = md.IntegerField('Версия корректировки')
     state = md.CharField('Статус данных о загрузке', max_length=2,
-                         default=DRAFT, choices=BOOKING_STATE_CHOICES)
+                         default=PLAN, choices=BOOKING_STATE_CHOICES)
 
     def __str__(self):
-        return f'{self.project_member}, загрузка {self.month:%m.%Y} составляет {self.load}%'
+        wd = workdays(self.start_date, self.finish_date)
+        return f'Загрузка c {self.start_date:%d.%m.%Y} по {self.finish_date:%d.%m.%Y}, {wd} раб.дн., {self.load}%, \
+        объем {volume(wd, self.load)} чел.дн.'

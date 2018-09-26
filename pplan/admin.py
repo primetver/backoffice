@@ -102,10 +102,14 @@ class ProjectMemberAdmin(admin.ModelAdmin):
     '''
     Администрирование участников
     '''
-    list_display = ('project', 'employee', 'role')
+    class BookingInline(admin.TabularInline):
+        model = Booking
+        extra = 0
+
+    inlines = [BookingInline]
+    list_display = ('project', 'employee', 'role', 'start_date', 'finish_date', 'volume', 'percent')
     list_filter = ('project__business__name','project__short_name', 'project__state', 'role')
     #search_fields = (
     #    'employee__last_name', 'employee__first_name', 'employee__sur_name',
     #    'project__business__name','project__short_name', 'role__role')
 
-admin.site.register(Booking)
