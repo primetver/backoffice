@@ -8,6 +8,9 @@ from django.utils import timezone
 from monthdelta import monthdelta, monthmod
 from phonenumber_field.modelfields import PhoneNumberField
 
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
 # Create your models here.
 
 class Division(md.Model):
@@ -436,43 +439,6 @@ class Booking(md.Model):
         return f'Загрузка c {self.start_date:%d.%m.%Y} по {self.finish_date:%d.%m.%Y}, {wd} раб.дн., {self.load}%, \
         объем {volume(wd, self.load)} чел.дн.'
 
-    def clean(self):
-        self._update_month_booking()
-
-    def _update_month_booking(self):
-        '''
-        Обновление данных о месячной загрузке в связанной таблице MonthBooking
-        '''
-        # удаление старых данных
-        MonthBooking.objects.filter(booking=self).delete()
-
-        # округление начального и конечного месяца участия в проекте до 1 числа
-        start_month = self.start_date.replace(day=1)
-        end_month = self.finish_date.replace(day=1)
-        
-        # месяцы, в которых нужно отразить нагрузку 
-        month_generator = (start_month + monthdelta(i) for i in range(monthmod(start_month, end_month)[0].months + 1))
-
-        for month in month_generator:
-            # последнее число месяца
-            monthtail = month + monthdelta(1) - datetime.timedelta(1)
-
-            start = month if self.start_date < month else self.start_date
-            finish = monthtail if self.finish_date > monthtail else self.finish_date
-
-            days = workdays(start, finish)                          # число запланированных рабочих дней в месяце 
-            vol = volume(days, self.load)                           # трудоемкость работ в месяце
-            load = days / workdays(month, monthtail) * self.load    # нагрузка за месяц
-
-            # заполнение таблицы помесячной загрузки
-            month_booking = MonthBooking(
-                booking=self,
-                month=month,
-                days=days,
-                load=load,
-                volume=vol)
-            month_booking.save()
-
 
 class MonthBooking(md.Model):
     ''' 
@@ -496,3 +462,39 @@ class MonthBooking(md.Model):
 
     def __str__(self):
         return f'Месяц: {self.month:%m.%Y}: {self.days} дней, {self.load}%, {self.volume} чел.дн.'
+
+
+@receiver(post_save, sender=Booking)
+def update_month_booking(sender, instance, **kwargs):
+    '''
+    Обновление данных о месячной загрузке в связанной таблице MonthBooking
+    '''
+    # удаление старых данных
+    MonthBooking.objects.filter(booking=instance).delete()
+
+    # округление начального и конечного месяца участия в проекте до 1 числа
+    start_month = instance.start_date.replace(day=1)
+    end_month = instance.finish_date.replace(day=1)
+    
+    # месяцы, в которых нужно отразить нагрузку 
+    month_generator = (start_month + monthdelta(i) for i in range(monthmod(start_month, end_month)[0].months + 1))
+
+    for month in month_generator:
+        # последнее число месяца
+        monthtail = month + monthdelta(1) - datetime.timedelta(1)
+
+        start = month if instance.start_date < month else instance.start_date
+        finish = monthtail if instance.finish_date > monthtail else instance.finish_date
+
+        days = workdays(start, finish)                              # число запланированных рабочих дней в месяце 
+        vol = volume(days, instance.load)                           # трудоемкость работ в месяце
+        load = days / workdays(month, monthtail) * instance.load    # нагрузка за месяц
+
+        # заполнение таблицы помесячной загрузки
+        month_booking = MonthBooking(
+            booking=instance,
+            month=month,
+            days=days,
+            load=load,
+            volume=vol)
+        month_booking.save()
