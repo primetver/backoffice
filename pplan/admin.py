@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Division, Position, StaffingTable, Employee, Salary, Business, Project, Role, ProjectMember, Booking
+from .models import Division, Position, StaffingTable, Employee, Salary, Passport, Business, Project, Role, ProjectMember, Booking, MonthBooking
 
 
 admin.AdminSite.site_header = 'Тверской филиал'
@@ -45,6 +45,11 @@ class EmployeeAdmin(admin.ModelAdmin):
     '''
     Администрирование сотрудника
     '''
+    class PassportInline(admin.StackedInline):
+        model = Passport
+        extra = 0
+        fields = (('doctype', 'is_valid'), ('series', 'number'), ('issuer', 'issue_date'), 'registered')
+
     class SalaryInline(admin.TabularInline):
         model = Salary
         extra = 0
@@ -67,7 +72,7 @@ class EmployeeAdmin(admin.ModelAdmin):
             })
     ]    
 
-    inlines = [SalaryInline, ProjectMemberInline]
+    inlines = [PassportInline, SalaryInline]
     list_display = ('full_name', 'division', 'position', 'salary', 'hire_date', 'fire_date', 'is_3d')
     list_filter = ('division__name', 'position__name', 'is_3d', 'hire_date', 'fire_date')
 
@@ -113,3 +118,9 @@ class ProjectMemberAdmin(admin.ModelAdmin):
     #    'employee__last_name', 'employee__first_name', 'employee__sur_name',
     #    'project__business__name','project__short_name', 'role__role')
 
+
+@admin.register(MonthBooking)
+class MonthBookingAdmin(admin.ModelAdmin):
+    list_display = ('project_member', 'month', 'days', 'load', 'volume')
+    readonly_fields = ('booking', 'month', 'days', 'load', 'volume')
+    list_display_links = None

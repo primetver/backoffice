@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models as md
 from django.utils import timezone
+from monthdelta import monthdelta, monthmod
 from phonenumber_field.modelfields import PhoneNumberField
 
 # Create your models here.
@@ -200,6 +201,33 @@ class Salary(md.Model):
         except TypeError: pass
 
 
+class Passport(md.Model):
+    '''
+    Паспортные данные
+    '''
+    class Meta():
+        verbose_name = 'паспорт'
+        verbose_name_plural = 'паспортные данные'
+        ordering = ('-is_valid', 'issue_date')
+
+    RF = 'RF'
+    INTER = 'IN'
+    DOCTYPE_CHOICES = (
+        (RF, 'Российский паспорт'),
+        (INTER, 'Заграничный паспорт'),
+    )
+    
+    employee = md.ForeignKey(Employee, on_delete=md.CASCADE, verbose_name='Сотрудник')
+    doctype = md.CharField('Тип документа', max_length=2, 
+        default=RF, choices=DOCTYPE_CHOICES)
+    series = md.CharField('Серия', max_length=20)
+    number = md.CharField('Номер', max_length=20)
+    issue_date = md.DateField('Дата выдачи')
+    issuer = md.CharField('Кем выдан', max_length=200)
+    registered = md.TextField('Зарегистрирован', null=True, blank=True)
+    is_valid = md.BooleanField('Действителен', default=True)
+
+
 class Business(md.Model):
     '''
     Бизнес
@@ -331,8 +359,13 @@ class ProjectMember(md.Model):
     percent.short_description = 'Загрузка, %'
 
     def __str__(self):
-        return f'{self.project}, {self.employee}, {self.role} с {self.start_date():%d.%m.%Y} по {self.finish_date():%d.%m.%Y}, \
-            объем {self.volume()} чел.дн., {self.percent()}%'
+        start   = self.start_date()
+        finish  = self.finish_date()
+        if start and finish:
+            load = f' с {start:%d.%m.%Y} по {finish:%d.%m.%Y}, объем {self.volume()} чел.дн., {self.percent()}%'
+        else:
+            load = ''
+        return f'{self.project}, {self.employee}, {self.role}{load}'
 
     def _start_date_for_state(self, state):
         try:
@@ -393,11 +426,73 @@ class Booking(md.Model):
     project_member = md.ForeignKey(ProjectMember, on_delete=md.CASCADE, verbose_name='Участник проекта')
     start_date = md.DateField('Начало загрузки', default=today)             
     finish_date = md.DateField('Окончание загрузки', default=tomorrow)
-    load = md.FloatField('Процент загрузки', default=100)    # от 0 до 100 и более (100% -- полная загрузка)
+    load = md.FloatField('Процент загрузки', default=0, 
+        validators=[MinValueValidator(0), MaxValueValidator(100)])    # от 0 до 100 (100% -- полная загрузка)
     state = md.CharField('Статус данных о загрузке', max_length=2,
-                         default=PLAN, choices=BOOKING_STATE_CHOICES)
+        default=PLAN, choices=BOOKING_STATE_CHOICES)
 
     def __str__(self):
         wd = workdays(self.start_date, self.finish_date)
         return f'Загрузка c {self.start_date:%d.%m.%Y} по {self.finish_date:%d.%m.%Y}, {wd} раб.дн., {self.load}%, \
         объем {volume(wd, self.load)} чел.дн.'
+
+    def clean(self):
+        self._update_month_booking()
+
+    def _update_month_booking(self):
+        '''
+        Обновление данных о месячной загрузке в связанной таблице MonthBooking
+        '''
+        # удаление старых данных
+        MonthBooking.objects.filter(booking=self).delete()
+
+        # округление начального и конечного месяца участия в проекте до 1 числа
+        start_month = self.start_date.replace(day=1)
+        end_month = self.finish_date.replace(day=1)
+        
+        # месяцы, в которых нужно отразить нагрузку 
+        month_generator = (start_month + monthdelta(i) for i in range(monthmod(start_month, end_month)[0].months + 1))
+
+        for month in month_generator:
+            # последнее число месяца
+            monthtail = month + monthdelta(1) - datetime.timedelta(1)
+
+            start = month if self.start_date < month else self.start_date
+            finish = monthtail if self.finish_date > monthtail else self.finish_date
+
+            days = workdays(start, finish)                          # число запланированных рабочих дней в месяце 
+            vol = volume(days, self.load)                           # трудоемкость работ в месяце
+            load = days / workdays(month, monthtail) * self.load    # нагрузка за месяц
+
+            # заполнение таблицы помесячной загрузки
+            month_booking = MonthBooking(
+                booking=self,
+                month=month,
+                days=days,
+                load=load,
+                volume=vol)
+            month_booking.save()
+
+
+class MonthBooking(md.Model):
+    ''' 
+    Месячная загрузка участника проекта
+
+    Данная модель заполняется автоматически
+    '''
+    class Meta():
+        verbose_name = 'месячная загрузка'
+        verbose_name_plural = 'данные месячной загрузки'
+        ordering = ()
+    
+    booking = md.ForeignKey(Booking, on_delete=md.CASCADE, verbose_name='Запись по загрузке')
+    month = md.DateField('Месяц') # число месяца всегда должно быть == 1
+    days = md.IntegerField('Участие, дней')
+    load = md.FloatField('Процент загрузки в месяце', default=0) 
+    volume = md.FloatField('Объем, чел.дн.', default=0)
+
+    def project_member(self):
+        return f'{self.booking.project_member.project}, {self.booking.project_member.employee}'
+
+    def __str__(self):
+        return f'Месяц: {self.month:%m.%Y}: {self.days} дней, {self.load}%, {self.volume} чел.дн.'
