@@ -531,10 +531,12 @@ class EmployeeBooking(Employee):
         verbose_name_plural = 'данные месячной загрузки сотрудника'
         proxy = True
     
-    def booking(self, month=today().replace(day=1)):
+    def booking(self, month=None):
+        month = month if month else today().replace(day=1)
         return MonthBooking.objects.filter(
             booking__project_member__employee=self, month=month).aggregate(load=md.Sum('load'), volume=md.Sum('volume'))
     booking.short_description = 'Загрузка, объем' 
 
     def booking_year(self):
-        return list(self.booking(today().replace(day=1) + monthdelta(i-12)) for i in range(24))
+        start = today().replace(day=1) - monthdelta(12)
+        return list(self.booking(start + monthdelta(i)) for i in range(24))
