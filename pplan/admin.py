@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Division, Position, StaffingTable, Employee, Salary, Passport, Business, Project, Role, ProjectMember, Booking, MonthBooking
+from .models import Division, Position, StaffingTable, Employee, Salary, Passport, Business, Project, Role, ProjectMember
+from .models import Booking, MonthBooking, EmployeeBooking
 
 
 admin.AdminSite.site_header = 'Тверской филиал'
@@ -121,6 +122,17 @@ class ProjectMemberAdmin(admin.ModelAdmin):
 
 @admin.register(MonthBooking)
 class MonthBookingAdmin(admin.ModelAdmin):
-    list_display = ('project_member', 'month', 'days', 'load', 'volume')
+    list_display = ('project', 'member', 'month_str', 'days', 'load_str', 'volume_str')
     readonly_fields = ('booking', 'month', 'days', 'load', 'volume')
     list_display_links = None
+    list_filter = (
+        ('booking__project_member__employee', admin.RelatedOnlyFieldListFilter),
+        'booking__project_member__project__short_name',
+        'booking__project_member__project__state'
+        )
+    date_hierarchy = 'month'
+
+
+@admin.register(EmployeeBooking)
+class EmployeeBookingAdmin(admin.ModelAdmin):
+    list_display = ('last_name', 'first_name', 'sur_name', 'booking_year')

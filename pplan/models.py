@@ -4,12 +4,11 @@ import datetime
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models as md
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.utils import timezone
 from monthdelta import monthdelta, monthmod
 from phonenumber_field.modelfields import PhoneNumberField
-
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 
 # Create your models here.
 
@@ -437,7 +436,7 @@ class Booking(md.Model):
     def __str__(self):
         wd = workdays(self.start_date, self.finish_date)
         return f'Загрузка c {self.start_date:%d.%m.%Y} по {self.finish_date:%d.%m.%Y}, {wd} раб.дн., {self.load}%, \
-        объем {volume(wd, self.load)} чел.дн.'
+        объем {volume(wd, self.load):2f} чел.дн.'
 
 
 class MonthBooking(md.Model):
@@ -454,15 +453,36 @@ class MonthBooking(md.Model):
     booking = md.ForeignKey(Booking, on_delete=md.CASCADE, verbose_name='Запись по загрузке')
     month = md.DateField('Месяц') # число месяца всегда должно быть == 1
     days = md.IntegerField('Участие, дней')
-    load = md.FloatField('Процент загрузки в месяце', default=0) 
+    load = md.FloatField('Загрузка, %', default=0) 
     volume = md.FloatField('Объем, чел.дн.', default=0)
 
-    def project_member(self):
-        return f'{self.booking.project_member.project}, {self.booking.project_member.employee}'
+    def project(self):
+        return self.booking.project_member.project
+    project.short_description = 'Проект'
+        
+    def member(self):    
+        return self.booking.project_member.employee
+    member.short_description = 'Участник'
+
+    def month_str(self):
+        return f'{self.month:%m.%Y}'
+    month_str.short_description = 'Месяц'
+
+    def load_str(self):
+        return f'{self.load:.2f}%'
+    load_str.short_description = 'Загрузка %'
+
+    def volume_str(self):
+        return f'{self.volume:.2f}'
+    volume_str.short_description = 'Трудоемкость, чел.дн'
 
     def __str__(self):
-        return f'Месяц: {self.month:%m.%Y}: {self.days} дней, {self.load}%, {self.volume} чел.дн.'
+        return f'Месяц: {self.month_str()}: {self.days} дней, {self.load_str()}, {self.volume_str()} чел.дн.'
 
+    def clean(self):
+        # validate salary dates
+        raise ValidationError('Данные месячной загрузки рассчитываются автоматически и\
+        не могут быть добавлены или отредактированы вручную. Вернитесь к просмотру данных.')
 
 @receiver(post_save, sender=Booking)
 def update_month_booking(sender, instance, **kwargs):
@@ -498,3 +518,23 @@ def update_month_booking(sender, instance, **kwargs):
             load=load,
             volume=vol)
         month_booking.save()
+
+
+class EmployeeBooking(Employee):
+    ''' 
+    Сводная загрузка сотрудника
+
+    Прокси модель
+    '''
+    class Meta():
+        verbose_name = 'месячная загрузка сотрудника'
+        verbose_name_plural = 'данные месячной загрузки сотрудника'
+        proxy = True
+    
+    def booking(self, month=today().replace(day=1)):
+        return MonthBooking.objects.filter(
+            booking__project_member__employee=self, month=month).aggregate(load=md.Sum('load'), volume=md.Sum('volume'))
+    booking.short_description = 'Загрузка, объем' 
+
+    def booking_year(self):
+        return list(self.booking(today().replace(day=1) + monthdelta(i-12)) for i in range(24))
