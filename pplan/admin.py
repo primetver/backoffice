@@ -2,7 +2,6 @@ from django.contrib import admin
 from .models import Division, Position, StaffingTable, Employee, Salary, Passport, Business, Project, Role, ProjectMember
 from .models import Booking, MonthBooking, EmployeeBooking
 
-
 admin.AdminSite.site_header = 'Тверской филиал'
 
 @admin.register(Division)
@@ -132,7 +131,8 @@ class MonthBookingAdmin(admin.ModelAdmin):
         )
     date_hierarchy = 'month'
 
-
 @admin.register(EmployeeBooking)
 class EmployeeBookingAdmin(admin.ModelAdmin):
-    list_display = ('last_name', 'first_name', 'sur_name', 'booking_year')
+    change_list_template = 'admin/booking_summary_change_list.html'
+    list_display = ('last_name', 'first_name', 'sur_name', 'booking')
+

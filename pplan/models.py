@@ -7,6 +7,7 @@ from django.db import models as md
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
+from django_pandas.io import read_frame
 from monthdelta import monthdelta, monthmod
 from phonenumber_field.modelfields import PhoneNumberField
 
@@ -519,24 +520,43 @@ def update_month_booking(sender, instance, **kwargs):
             volume=vol)
         month_booking.save()
 
+'''
+class EmployeeBooking(Employee):
+ 
+    Сводная загрузка сотрудника
+
+    Прокси модель
+
+    class Meta():
+        verbose_name = 'статистика загрузки сотрудника'
+        verbose_name_plural = 'статистика загрузки сотрудников'
+        proxy = True
+    
+    def booking(self, month_from=None, count=24):
+        month_from = month_from if month_from else today().replace(day=1) - monthdelta(count // 2)
+        month_generator = (month_from + monthdelta(i) for i in range(count))
+
+        return list(MonthBooking.objects.filter(booking__project_member__employee=self, 
+            month=month).aggregate(load=md.Sum('load'), volume=md.Sum('volume')) for month in month_generator)
+    booking.short_description = 'Загрузка, объем'
+'''
 
 class EmployeeBooking(Employee):
     ''' 
     Сводная загрузка сотрудника
 
-    Прокси модель
+    Прокси модель, расчет с помощью pandas
     '''
     class Meta():
-        verbose_name = 'месячная загрузка сотрудника'
-        verbose_name_plural = 'данные месячной загрузки сотрудника'
+        verbose_name = 'статистика загрузки сотрудника'
+        verbose_name_plural = 'статистика загрузки сотрудников'
         proxy = True
     
-    def booking(self, month=None):
-        month = month if month else today().replace(day=1)
-        return MonthBooking.objects.filter(
-            booking__project_member__employee=self, month=month).aggregate(load=md.Sum('load'), volume=md.Sum('volume'))
-    booking.short_description = 'Загрузка, объем' 
+    def booking(self, month_from=None, count=24):
+        month_from = month_from if month_from else today().replace(day=1) - monthdelta(count // 2)
+        qs = MonthBooking.objects.filter(booking__project_member__employee=self, 
+            month__range=(month_from, month_from + monthdelta(count)))
 
-    def booking_year(self):
-        start = today().replace(day=1) - monthdelta(12)
-        return list(self.booking(start + monthdelta(i)) for i in range(24))
+        df = read_frame(qs, fieldnames=['load', 'volume'], index_col='month').groupby('month').sum()
+
+        return list({'load':df.load[m], 'volume':df.volume[m]} for m in df.index) 
