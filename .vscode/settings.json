@@ -2,10 +2,13 @@
     "python.pythonPath": "/home/ishiev/.pyenv/django/bin/python",
     "cSpell.words": [
         "descr",
+        "endblock",
+        "groupby",
         "kargs",
         "pplan",
         "primetver",
         "pylint",
+        "бизнесов",
         "бизнесы"
     ]
 }

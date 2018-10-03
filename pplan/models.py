@@ -1,15 +1,16 @@
 # pylint: disable=no-member
-import datetime
+from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models as md
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.utils import timezone
 from django_pandas.io import read_frame
 from monthdelta import monthdelta, monthmod
 from phonenumber_field.modelfields import PhoneNumberField
+
+from .datautils import today, tomorrow, volume, workdays
 
 # Create your models here.
 
@@ -29,7 +30,7 @@ class Division(md.Model):
     
     # pylint: disable=no-member
     def occupied(self):
-        return self.employee_set.exclude(fire_date__lt=timezone.now().date()).count()
+        return self.employee_set.exclude(fire_date__lt=today()).count()
         #return Employee.objects.filter(position__division__id=self.id).count()
     occupied.short_description = 'Работает сотрудников'
 
@@ -49,7 +50,7 @@ class Position(md.Model):
 
     # pylint: disable=no-member
     def occupied(self):
-        return self.employee_set.exclude(fire_date__lt=timezone.now().date()).count()
+        return self.employee_set.exclude(fire_date__lt=today()).count()
         # return Employee.objects.filter(position__position_name__id=self.id).count()
         # return sum(p.occupied() for p in self.position_set.all())   -- more slowly!
     occupied.short_description = 'Работает сотрудников'
@@ -75,7 +76,7 @@ class StaffingTable(md.Model):
     # pylint: disable=no-member
     def occupied(self):
         return Employee.objects.filter(division__name=self.division,
-            position__name=self.position).exclude(fire_date__lt=timezone.now().date()).count()
+            position__name=self.position).exclude(fire_date__lt=today()).count()
     occupied.short_description = 'Работает сотрудников'
 
     def vacant(self):
@@ -126,7 +127,7 @@ class Employee(md.Model):
     salary.short_description = 'Текущий оклад'
 
     def if_fired(self):
-        return self.fire_date < timezone.now().date()
+        return self.fire_date < today()
 
     def info(self):
         return f'{self.full_name()} ({self.id}), дата приема: {self.hire_date}, оклад: {self.salary()}'
@@ -389,23 +390,6 @@ class ProjectMember(md.Model):
         return sum(volume(workdays(b.start_date, b.finish_date), b.load) for b in booking)
         
 
-# Вспомогательные функции
-
-def today():
-    return timezone.now().date()
-
-def tomorrow():
-    return today() + datetime.timedelta(days=1)
-
-# Число рабочих дней без учета праздников, список выходных задается третьим параметром (понедельник = 0)
-def workdays(fromdate, todate, weekend=(5,6)):
-    daygenerator = (fromdate + datetime.timedelta(x) for x in range((todate - fromdate).days + 1))
-    return sum(1 for day in daygenerator if day.weekday() not in weekend)
-
-def volume(workdays, load):
-    return workdays * load / 100
-
-
 class Booking(md.Model):
     ''' 
     Загрузка участника проекта
@@ -502,7 +486,7 @@ def update_month_booking(sender, instance, **kwargs):
 
     for month in month_generator:
         # последнее число месяца
-        monthtail = month + monthdelta(1) - datetime.timedelta(1)
+        monthtail = month + monthdelta(1) - timedelta(1)
 
         start = month if instance.start_date < month else instance.start_date
         finish = monthtail if instance.finish_date > monthtail else instance.finish_date
@@ -552,11 +536,19 @@ class EmployeeBooking(Employee):
         verbose_name_plural = 'статистика загрузки сотрудников'
         proxy = True
     
-    def booking(self, month_from=None, count=24):
-        month_from = month_from if month_from else today().replace(day=1) - monthdelta(count // 2)
-        qs = MonthBooking.objects.filter(booking__project_member__employee=self, 
-            month__range=(month_from, month_from + monthdelta(count)))
+    def booking(self, month_list=None):
+        month_list = month_list if month_list else [ today().replace(day=1) ]
+        
+        qs = MonthBooking.objects.filter(
+            booking__project_member__employee=self, 
+            month__range=(month_list[0], month_list[-1])
+        )
 
         df = read_frame(qs, fieldnames=['load', 'volume'], index_col='month').groupby('month').sum()
 
-        return list({'load':df.load[m], 'volume':df.volume[m]} for m in df.index) 
+        return [ 
+            {
+                'load':df.load.get(month, 0),
+                'volume':df.volume.get(month, 0)
+            } for month in month_list 
+        ]

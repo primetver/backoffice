@@ -5,7 +5,39 @@
 {% endblock %}
 
 {% block result_list %}
-    Our content goes here…
+
+<div class="results">
+    <table>
+        
+    <thead>
+      <tr>
+        <th>
+          <div class="text">
+            <a href="#">Сотрудник</a>
+          </div>
+        </th>
+        {% for m in months %}
+        <th>
+          <div class="text">
+            <a href="#">{{ m | date:"Y.m" }}</a>
+          </div>
+        </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+        {% for row in summary %}
+        <tr class="{% cycle 'row1' 'row2' %}">
+            <td> {{ row.name }} </td>
+            {% for b in row.booking %}
+            <td> {{ b.load | floatformat:2 }}% </td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+  </table>
+</div>
+
 {% endblock %}
 
 {% block pagination %}{% endblock %}

@@ -1,8 +1,13 @@
 from django.contrib import admin
-from .models import Division, Position, StaffingTable, Employee, Salary, Passport, Business, Project, Role, ProjectMember
-from .models import Booking, MonthBooking, EmployeeBooking
+from monthdelta import monthdelta, monthmod
+
+from .datautils import today
+from .models import (Booking, Business, Division, Employee, EmployeeBooking,
+                     MonthBooking, Passport, Position, Project, ProjectMember,
+                     Role, Salary, StaffingTable)
 
 admin.AdminSite.site_header = 'Тверской филиал'
+
 
 @admin.register(Division)
 class DivisionAdmin(admin.ModelAdmin):
@@ -38,7 +43,7 @@ class StaffingTableAdmin(admin.ModelAdmin):
 class ProjectMemberInline(admin.TabularInline):
     model = ProjectMember
     extra = 0
-    
+
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
@@ -48,33 +53,36 @@ class EmployeeAdmin(admin.ModelAdmin):
     class PassportInline(admin.StackedInline):
         model = Passport
         extra = 0
-        fields = (('doctype', 'is_valid'), ('series', 'number'), ('issuer', 'issue_date'), 'registered')
+        fields = (('doctype', 'is_valid'), ('series', 'number'),
+                  ('issuer', 'issue_date'), 'registered')
 
     class SalaryInline(admin.TabularInline):
         model = Salary
         extra = 0
 
     fieldsets = [
-        (None,               
+        (None,
             {'fields': [
                 'last_name', 'first_name', 'sur_name',
                 ('division', 'position'),
                 'hire_date', 'fire_date',
                 ('is_3d', 'business_k')],
-            'classes': [],
-            }),
+             'classes': [],
+             }),
         ('Дополнительные сведения'.upper(),
             {'fields': [
                 'birthday',
                 ('local_phone', 'work_phone', 'mobile_phone')],
-            'classes': [
+             'classes': [
                 'collapse']
-            })
-    ]    
+             })
+    ]
 
     inlines = [PassportInline, SalaryInline]
-    list_display = ('full_name', 'division', 'position', 'salary', 'hire_date', 'fire_date', 'is_3d')
-    list_filter = ('division__name', 'position__name', 'is_3d', 'hire_date', 'fire_date')
+    list_display = ('full_name', 'division', 'position',
+                    'salary', 'hire_date', 'fire_date', 'is_3d')
+    list_filter = ('division__name', 'position__name',
+                   'is_3d', 'hire_date', 'fire_date')
 
 
 @admin.register(Project)
@@ -83,7 +91,8 @@ class ProjectAdmin(admin.ModelAdmin):
     Администрирование проекта и рабочей группы
     '''
     inlines = [ProjectMemberInline]
-    list_display = ('__str__', 'lead', 'member_count','start_date', 'finish_date', 'state')
+    list_display = ('__str__', 'lead', 'member_count',
+                    'start_date', 'finish_date', 'state')
     list_filter = ('business__name', 'state', 'budget_state')
 
 
@@ -102,6 +111,7 @@ class RoleAdmin(admin.ModelAdmin):
     '''
     list_display = ('role', 'is_lead')
 
+
 @admin.register(ProjectMember)
 class ProjectMemberAdmin(admin.ModelAdmin):
     '''
@@ -112,27 +122,58 @@ class ProjectMemberAdmin(admin.ModelAdmin):
         extra = 0
 
     inlines = [BookingInline]
-    list_display = ('project', 'employee', 'role', 'start_date', 'finish_date', 'volume', 'percent')
-    list_filter = ('project__business__name','project__short_name', 'project__state', 'role')
-    #search_fields = (
+    list_display = ('project', 'employee', 'role', 'start_date',
+                    'finish_date', 'volume', 'percent')
+    list_filter = ('project__business__name',
+                   'project__short_name', 'project__state', 'role')
+    # search_fields = (
     #    'employee__last_name', 'employee__first_name', 'employee__sur_name',
     #    'project__business__name','project__short_name', 'role__role')
+    date_hierarchy = 'project__start_date'
 
 
 @admin.register(MonthBooking)
 class MonthBookingAdmin(admin.ModelAdmin):
-    list_display = ('project', 'member', 'month_str', 'days', 'load_str', 'volume_str')
+    list_display = ('project', 'member', 'month_str',
+                    'days', 'load_str', 'volume_str')
     readonly_fields = ('booking', 'month', 'days', 'load', 'volume')
     list_display_links = None
     list_filter = (
         ('booking__project_member__employee', admin.RelatedOnlyFieldListFilter),
         'booking__project_member__project__short_name',
         'booking__project_member__project__state'
-        )
+    )
     date_hierarchy = 'month'
+
 
 @admin.register(EmployeeBooking)
 class EmployeeBookingAdmin(admin.ModelAdmin):
     change_list_template = 'admin/booking_summary_change_list.html'
-    list_display = ('last_name', 'first_name', 'sur_name', 'booking')
+    list_filter = ('division__name', 'position__name',
+                   'is_3d', 'hire_date', 'fire_date')
 
+    def changelist_view(self, request, extra_context=None):
+        response = super().changelist_view(
+            request,
+            extra_context=extra_context
+        )
+
+        try:
+            qs = response.context_data['cl'].queryset
+        except (AttributeError, KeyError):
+            return response
+
+        before = 6
+        count = 12 + before
+        month_from = today().replace(day=1) - monthdelta(before)
+        month_list = [ month_from + monthdelta(i) for i in range(count)]
+
+        response.context_data['months']  = month_list
+        response.context_data['summary'] = (
+            {
+                'name': e.full_name(),
+                'booking': e.booking(month_list)
+            } for e in qs
+        )
+
+        return response
