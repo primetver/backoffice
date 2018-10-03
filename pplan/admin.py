@@ -3,7 +3,7 @@ from monthdelta import monthdelta, monthmod
 
 from .datautils import today
 from .models import (Booking, Business, Division, Employee, EmployeeBooking,
-                     MonthBooking, Passport, Position, Project, ProjectMember,
+                     MonthBooking, Passport, Position, Project, ProjectMember,ProjectMemberBooking,
                      Role, Salary, StaffingTable)
 
 admin.AdminSite.site_header = 'Тверской филиал'
@@ -177,3 +177,35 @@ class EmployeeBookingAdmin(admin.ModelAdmin):
         )
 
         return response
+
+@admin.register(ProjectMemberBooking)
+class ProjectMemberBookingAdmin(admin.ModelAdmin):
+    change_list_template = 'admin/booking_summary_change_list.html'
+    list_filter = ('project__short_name',)
+
+    def changelist_view(self, request, extra_context=None):
+        response = super().changelist_view(
+            request,
+            extra_context=extra_context
+        )
+
+        try:
+            qs = response.context_data['cl'].queryset
+        except (AttributeError, KeyError):
+            return response
+
+        before = 6
+        count = 12 + before
+        month_from = today().replace(day=1) - monthdelta(before)
+        month_list = [ month_from + monthdelta(i) for i in range(count)]
+
+        response.context_data['months']  = month_list
+        response.context_data['summary'] = (
+            {
+                'name': e.employee.full_name(),
+                'booking': e.member_booking(month_list)
+            } for e in qs
+        )
+
+        return response
+

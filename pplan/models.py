@@ -540,7 +540,7 @@ class EmployeeBooking(Employee):
         month_list = month_list if month_list else [ today().replace(day=1) ]
         
         qs = MonthBooking.objects.filter(
-            booking__project_member__employee=self, 
+            booking__project_member__employee=self,
             month__range=(month_list[0], month_list[-1])
         )
 
@@ -552,3 +552,34 @@ class EmployeeBooking(Employee):
                 'volume':df.volume.get(month, 0)
             } for month in month_list 
         ]
+
+
+class ProjectMemberBooking(ProjectMember):
+    ''' 
+    Сводная статистика загрузки сотрудника
+
+    Прокси модель, расчет с помощью pandas
+    '''
+    class Meta():
+        verbose_name = 'статистика загрузки сотрудника в проекте'
+        verbose_name_plural = 'статистика загрузки сотрудников в проектах'
+        proxy = True
+    
+    def member_booking(self, month_list=None):
+        month_list = month_list if month_list else [ today().replace(day=1) ]
+        
+        qs = MonthBooking.objects.filter(
+            booking__project_member__employee=self.employee,
+            booking__project_member__project=self.project,
+            month__range=(month_list[0], month_list[-1])
+        )
+
+        df = read_frame(qs, fieldnames=['load', 'volume'], index_col='month').groupby('month').sum()
+
+        return [ 
+            {
+                'load':df.load.get(month, 0),
+                'volume':df.volume.get(month, 0)
+            } for month in month_list 
+        ]
+
