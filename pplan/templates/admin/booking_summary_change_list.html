@@ -30,7 +30,11 @@
         <tr class="{% cycle 'row1' 'row2' %}">
             <td> {{ row.name }} </td>
             {% for b in row.booking %}
-            <td> {{ b.load | floatformat:2 }}% </td>
+            <td>
+                {% if b.load < 100 %}<strong>{% endif %}
+                {{ b.load | default:'' | floatformat:2 }}
+                {% if b.load < 100 %}</strong>{% endif %}
+            </td>
             {% endfor %}
         </tr>
         {% endfor %}

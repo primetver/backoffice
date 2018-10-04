@@ -3,11 +3,13 @@ from monthdelta import monthdelta, monthmod
 
 from .datautils import today
 from .models import (Booking, Business, Division, Employee, EmployeeBooking,
-                     MonthBooking, Passport, Position, Project, ProjectMember,ProjectMemberBooking,
+                     MonthBooking, Passport, Position, Project, ProjectMember, ProjectMemberBooking,
                      Role, Salary, StaffingTable)
 
-admin.AdminSite.site_header = 'Тверской филиал'
+from django_pandas.io import read_frame
 
+
+admin.AdminSite.site_header = 'Тверской филиал'
 
 @admin.register(Division)
 class DivisionAdmin(admin.ModelAdmin):
@@ -134,16 +136,76 @@ class ProjectMemberAdmin(admin.ModelAdmin):
 
 @admin.register(MonthBooking)
 class MonthBookingAdmin(admin.ModelAdmin):
-    list_display = ('project', 'member', 'month_str',
-                    'days', 'load_str', 'volume_str')
     readonly_fields = ('booking', 'month', 'days', 'load', 'volume')
     list_display_links = None
     list_filter = (
-        ('booking__project_member__employee', admin.RelatedOnlyFieldListFilter),
         'booking__project_member__project__short_name',
-        'booking__project_member__project__state'
+        'booking__project_member__role__role',
+        'booking__project_member__project__state',
+        'booking__project_member__project__budget_state'
     )
-    date_hierarchy = 'month'
+    change_list_template = 'admin/booking_summary_change_list.html'
+
+    # Изменение отображения списка сотрудников и месячной загруженности в проекте
+    def changelist_view(self, request, extra_context=None):
+        response = super().changelist_view(
+            request,
+            extra_context=extra_context
+        )
+
+        try:
+            qs = response.context_data['cl'].queryset
+        except (AttributeError, KeyError):
+            return response
+
+        before = 6
+        count = 12 + before
+        month_from = today().replace(day=1) - monthdelta(before)
+        month_list = [month_from + monthdelta(i) for i in range(count)]
+
+        response.context_data['months'] = month_list
+        response.context_data['summary'] = get_booking_summary(qs, month_list=month_list)
+
+        return response
+
+# вспомогательная функция формирования набора данных для отображения
+
+
+def get_booking_summary(qs, month_list=None):
+    month_list = month_list if month_list else [today().replace(day=1)]
+
+    # ограничение запроса заданным диапазоном интересующих нас месяцев, если они заданы
+    if month_list:
+        qs = qs.filter(month__range=(month_list[0], month_list[-1]))
+
+    # чтение DataFrame
+    df = read_frame(
+        qs,
+        fieldnames=[
+            'booking__project_member__employee',
+            #'booking__project_member__project__short_name',
+            'month',
+            'load',
+            'volume'
+        ]
+    )
+
+    month_booking = df.groupby(['booking__project_member__employee', 'month']).sum()
+
+    if month_booking.empty:
+        return []
+
+    return (
+        {
+            'name': e, 
+            'booking': [
+                {
+                    'load':booking.ix[e].load.get(month, 0),
+                    'volume':booking.ix[e].volume.get(month, 0)
+                } for month in month_list
+            ]
+        } for e, booking in month_booking.groupby(level='booking__project_member__employee')
+    )
 
 
 @admin.register(EmployeeBooking)
@@ -166,9 +228,9 @@ class EmployeeBookingAdmin(admin.ModelAdmin):
         before = 6
         count = 12 + before
         month_from = today().replace(day=1) - monthdelta(before)
-        month_list = [ month_from + monthdelta(i) for i in range(count)]
+        month_list = [month_from + monthdelta(i) for i in range(count)]
 
-        response.context_data['months']  = month_list
+        response.context_data['months'] = month_list
         response.context_data['summary'] = (
             {
                 'name': e.full_name(),
@@ -177,6 +239,7 @@ class EmployeeBookingAdmin(admin.ModelAdmin):
         )
 
         return response
+
 
 @admin.register(ProjectMemberBooking)
 class ProjectMemberBookingAdmin(admin.ModelAdmin):
@@ -197,9 +260,9 @@ class ProjectMemberBookingAdmin(admin.ModelAdmin):
         before = 6
         count = 12 + before
         month_from = today().replace(day=1) - monthdelta(before)
-        month_list = [ month_from + monthdelta(i) for i in range(count)]
+        month_list = [month_from + monthdelta(i) for i in range(count)]
 
-        response.context_data['months']  = month_list
+        response.context_data['months'] = month_list
         response.context_data['summary'] = (
             {
                 'name': e.employee.full_name(),
@@ -208,4 +271,3 @@ class ProjectMemberBookingAdmin(admin.ModelAdmin):
         )
 
         return response
-
