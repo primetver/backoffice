@@ -12,6 +12,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 from .datautils import today, tomorrow, volume, workdays
 
+
 # Create your models here.
 
 class Division(md.Model):
@@ -351,9 +352,19 @@ class ProjectMember(md.Model):
         return self._finish_date_for_state(Booking.PLAN)
     finish_date.short_description = 'Дата окончания'
 
+    def month_count(self):
+        # SqlLite do not support distinct on fields
+        month_list = MonthBooking.objects.filter(booking__project_member=self).values_list('month', flat=True)
+        return len(set(month_list))
+    month_count.short_description = 'Месяцев'
+
     def volume(self):
         return self._volume_for_state(Booking.PLAN)
     volume.short_description = 'Объем, чел.дн'
+
+    def volume_str(self):
+        return f'{self.volume():n}'
+    volume_str.short_description = volume.short_description
 
     def percent(self):
         try:
@@ -362,11 +373,27 @@ class ProjectMember(md.Model):
             return 0
     percent.short_description = 'Загрузка, %'
 
+    def percent_str(self):
+        return f'{self.percent():n}'
+    percent_str.short_description = percent.short_description
+
+    def load(self):
+        '''
+        Среднемесячная загрузка
+        '''
+        return MonthBooking.objects.filter(
+            booking__project_member=self).aggregate(md.Avg('load'))['load__avg']
+    load.short_description = 'Средн.мес., %'
+
+    def load_str(self):
+        return f'{self.load():n}'
+    load_str.short_description = load.short_description
+
     def __str__(self):
         start   = self.start_date()
         finish  = self.finish_date()
         if start and finish:
-            load = f' с {start:%d.%m.%Y} по {finish:%d.%m.%Y}, объем {self.volume()} чел.дн., {self.percent()}%'
+            load = f' с {start:%d.%m.%Y} по {finish:%d.%m.%Y}, объем {self.volume_str()} чел.дн., {self.load_str()}%'
         else:
             load = ''
         return f'{self.project}, {self.employee}, {self.role}{load}'
@@ -421,7 +448,7 @@ class Booking(md.Model):
     def __str__(self):
         wd = workdays(self.start_date, self.finish_date)
         return f'Загрузка c {self.start_date:%d.%m.%Y} по {self.finish_date:%d.%m.%Y}, {wd} раб.дн., {self.load}%, \
-        объем {volume(wd, self.load):2f} чел.дн.'
+        объем {volume(wd, self.load):n} чел.дн.'
 
 
 class MonthBooking(md.Model):
@@ -432,7 +459,7 @@ class MonthBooking(md.Model):
     '''
     class Meta():
         verbose_name = 'месячная загрузка'
-        verbose_name_plural = 'данные месячной загрузки'
+        verbose_name_plural = 'статистика месячной загрузки'
         ordering = ()
     
     booking = md.ForeignKey(Booking, on_delete=md.CASCADE, verbose_name='Запись по загрузке')
@@ -454,11 +481,11 @@ class MonthBooking(md.Model):
     month_str.short_description = 'Месяц'
 
     def load_str(self):
-        return f'{self.load:.2f}%'
+        return f'{self.load:n}%'
     load_str.short_description = 'Загрузка %'
 
     def volume_str(self):
-        return f'{self.volume:.2f}'
+        return f'{self.volume:n}'
     volume_str.short_description = 'Трудоемкость, чел.дн'
 
     def __str__(self):
@@ -503,83 +530,3 @@ def update_month_booking(sender, instance, **kwargs):
             load=load,
             volume=vol)
         month_booking.save()
-
-'''
-class EmployeeBooking(Employee):
- 
-    Сводная загрузка сотрудника
-
-    Прокси модель
-
-    class Meta():
-        verbose_name = 'статистика загрузки сотрудника'
-        verbose_name_plural = 'статистика загрузки сотрудников'
-        proxy = True
-    
-    def booking(self, month_from=None, count=24):
-        month_from = month_from if month_from else today().replace(day=1) - monthdelta(count // 2)
-        month_generator = (month_from + monthdelta(i) for i in range(count))
-
-        return list(MonthBooking.objects.filter(booking__project_member__employee=self, 
-            month=month).aggregate(load=md.Sum('load'), volume=md.Sum('volume')) for month in month_generator)
-    booking.short_description = 'Загрузка, объем'
-'''
-
-class EmployeeBooking(Employee):
-    ''' 
-    Сводная загрузка сотрудника
-
-    Прокси модель, расчет с помощью pandas
-    '''
-    class Meta():
-        verbose_name = 'статистика загрузки сотрудника'
-        verbose_name_plural = 'статистика загрузки сотрудников'
-        proxy = True
-    
-    def booking(self, month_list=None):
-        month_list = month_list if month_list else [ today().replace(day=1) ]
-        
-        qs = MonthBooking.objects.filter(
-            booking__project_member__employee=self,
-            month__range=(month_list[0], month_list[-1])
-        )
-
-        df = read_frame(qs, fieldnames=['load', 'volume'], index_col='month').groupby('month').sum()
-
-        return [ 
-            {
-                'load':df.load.get(month, 0),
-                'volume':df.volume.get(month, 0)
-            } for month in month_list 
-        ]
-
-
-class ProjectMemberBooking(ProjectMember):
-    ''' 
-    Сводная статистика загрузки сотрудника
-
-    Прокси модель, расчет с помощью pandas
-    '''
-    class Meta():
-        verbose_name = 'статистика загрузки сотрудника в проекте'
-        verbose_name_plural = 'статистика загрузки сотрудников в проектах'
-        proxy = True
-    
-    def member_booking(self, month_list=None):
-        month_list = month_list if month_list else [ today().replace(day=1) ]
-        
-        qs = MonthBooking.objects.filter(
-            booking__project_member__employee=self.employee,
-            booking__project_member__project=self.project,
-            month__range=(month_list[0], month_list[-1])
-        )
-
-        df = read_frame(qs, fieldnames=['load', 'volume'], index_col='month').groupby('month').sum()
-
-        return [ 
-            {
-                'load':df.load.get(month, 0),
-                'volume':df.volume.get(month, 0)
-            } for month in month_list 
-        ]
-

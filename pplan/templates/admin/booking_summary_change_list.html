@@ -1,24 +1,23 @@
 {% extends 'admin/change_list.html' %}
 
 {% block content_title %}
-    <h1>Статистика загрузки сотрудников по проектам</h1>
+    <h1>Статистика месячной загрузки участников проектов, %</h1>
 {% endblock %}
 
 {% block result_list %}
 
 <div class="results">
-    <table>
-        
+  <table>
     <thead>
       <tr>
         <th>
           <div class="text">
-            <a href="#">Сотрудник</a>
+            <a href="#">Участник проекта</a>
           </div>
         </th>
         {% for m in months %}
         <th>
-          <div class="text">
+          <div class="text" align="right">
             <a href="#">{{ m | date:"Y.m" }}</a>
           </div>
         </th>
@@ -30,7 +29,7 @@
         <tr class="{% cycle 'row1' 'row2' %}">
             <td> {{ row.name }} </td>
             {% for b in row.booking %}
-            <td>
+            <td align="right">
                 {% if b.load < 100 %}<strong>{% endif %}
                 {{ b.load | default:'' | floatformat:2 }}
                 {% if b.load < 100 %}</strong>{% endif %}

@@ -2,8 +2,8 @@ from django.contrib import admin
 from monthdelta import monthdelta, monthmod
 
 from .datautils import today
-from .models import (Booking, Business, Division, Employee, EmployeeBooking,
-                     MonthBooking, Passport, Position, Project, ProjectMember, ProjectMemberBooking,
+from .models import (Booking, Business, Division, Employee, 
+                     MonthBooking, Passport, Position, Project, ProjectMember, 
                      Role, Salary, StaffingTable)
 
 from django_pandas.io import read_frame
@@ -125,9 +125,9 @@ class ProjectMemberAdmin(admin.ModelAdmin):
 
     inlines = [BookingInline]
     list_display = ('project', 'employee', 'role', 'start_date',
-                    'finish_date', 'volume', 'percent')
-    list_filter = ('project__business__name',
-                   'project__short_name', 'project__state', 'role')
+                    'finish_date', 'volume_str', 'percent_str', 'month_count', 'load_str')
+    list_display_links = ('employee',)
+    list_filter = ('project__short_name', 'role', 'project__state')
     # search_fields = (
     #    'employee__last_name', 'employee__first_name', 'employee__sur_name',
     #    'project__business__name','project__short_name', 'role__role')
@@ -136,7 +136,10 @@ class ProjectMemberAdmin(admin.ModelAdmin):
 
 @admin.register(MonthBooking)
 class MonthBookingAdmin(admin.ModelAdmin):
-    readonly_fields = ('booking', 'month', 'days', 'load', 'volume')
+    '''
+    Отчет по месячной загрузке сотрудников
+    '''
+
     list_display_links = None
     list_filter = (
         'booking__project_member__project__short_name',
@@ -145,7 +148,12 @@ class MonthBookingAdmin(admin.ModelAdmin):
         'booking__project_member__project__budget_state'
     )
     change_list_template = 'admin/booking_summary_change_list.html'
+    #date_hierarchy = 'booking__project_member__project__start_date'
 
+    # Данные месячной загрузки можно только смотреть или удалить (через связанный объект)
+    def has_add_permission(*args, **kwargs): return False
+    def has_change_permission(*args, **kwarg): return False
+    
     # Изменение отображения списка сотрудников и месячной загруженности в проекте
     def changelist_view(self, request, extra_context=None):
         response = super().changelist_view(
@@ -168,9 +176,8 @@ class MonthBookingAdmin(admin.ModelAdmin):
 
         return response
 
-# вспомогательная функция формирования набора данных для отображения
 
-
+# Вспомогательная функция формирования набора данных для отображения
 def get_booking_summary(qs, month_list=None):
     month_list = month_list if month_list else [today().replace(day=1)]
 
@@ -206,68 +213,3 @@ def get_booking_summary(qs, month_list=None):
             ]
         } for e, booking in month_booking.groupby(level='booking__project_member__employee')
     )
-
-
-@admin.register(EmployeeBooking)
-class EmployeeBookingAdmin(admin.ModelAdmin):
-    change_list_template = 'admin/booking_summary_change_list.html'
-    list_filter = ('division__name', 'position__name',
-                   'is_3d', 'hire_date', 'fire_date')
-
-    def changelist_view(self, request, extra_context=None):
-        response = super().changelist_view(
-            request,
-            extra_context=extra_context
-        )
-
-        try:
-            qs = response.context_data['cl'].queryset
-        except (AttributeError, KeyError):
-            return response
-
-        before = 6
-        count = 12 + before
-        month_from = today().replace(day=1) - monthdelta(before)
-        month_list = [month_from + monthdelta(i) for i in range(count)]
-
-        response.context_data['months'] = month_list
-        response.context_data['summary'] = (
-            {
-                'name': e.full_name(),
-                'booking': e.booking(month_list)
-            } for e in qs
-        )
-
-        return response
-
-
-@admin.register(ProjectMemberBooking)
-class ProjectMemberBookingAdmin(admin.ModelAdmin):
-    change_list_template = 'admin/booking_summary_change_list.html'
-    list_filter = ('project__short_name',)
-
-    def changelist_view(self, request, extra_context=None):
-        response = super().changelist_view(
-            request,
-            extra_context=extra_context
-        )
-
-        try:
-            qs = response.context_data['cl'].queryset
-        except (AttributeError, KeyError):
-            return response
-
-        before = 6
-        count = 12 + before
-        month_from = today().replace(day=1) - monthdelta(before)
-        month_list = [month_from + monthdelta(i) for i in range(count)]
-
-        response.context_data['months'] = month_list
-        response.context_data['summary'] = (
-            {
-                'name': e.employee.full_name(),
-                'booking': e.member_booking(month_list)
-            } for e in qs
-        )
-
-        return response
