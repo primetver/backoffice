@@ -2,14 +2,15 @@ from django.contrib import admin
 from monthdelta import monthdelta, monthmod
 
 from .datautils import today
-from .models import (Booking, Business, Division, Employee, 
-                     MonthBooking, Passport, Position, Project, ProjectMember, 
+from .models import (Booking, Business, Division, Employee,
+                     MonthBooking, Passport, Position, Project, ProjectMember,
                      Role, Salary, StaffingTable)
 
 from django_pandas.io import read_frame
 
 
 admin.AdminSite.site_header = 'Тверской филиал'
+
 
 @admin.register(Division)
 class DivisionAdmin(admin.ModelAdmin):
@@ -151,9 +152,10 @@ class MonthBookingAdmin(admin.ModelAdmin):
     #date_hierarchy = 'booking__project_member__project__start_date'
 
     # Данные месячной загрузки можно только смотреть или удалить (через связанный объект)
-    def has_add_permission(*args, **kwargs): return False
-    def has_change_permission(*args, **kwarg): return False
-    
+    def has_add_permission(self, request, extra_context=None): return False
+
+    def has_change_permission(self, request, extra_context=None): return False
+
     # Изменение отображения списка сотрудников и месячной загруженности в проекте
     def changelist_view(self, request, extra_context=None):
         response = super().changelist_view(
@@ -172,7 +174,10 @@ class MonthBookingAdmin(admin.ModelAdmin):
         month_list = [month_from + monthdelta(i) for i in range(count)]
 
         response.context_data['months'] = month_list
-        response.context_data['summary'] = get_booking_summary(qs, month_list=month_list)
+        response.context_data['summary'] = get_booking_summary(
+            qs, month_list=month_list)
+        response.context_data['projects'] = set(qs.values_list(
+            'booking__project_member__project__short_name', flat=True))
 
         return response
 
@@ -185,31 +190,36 @@ def get_booking_summary(qs, month_list=None):
     if month_list:
         qs = qs.filter(month__range=(month_list[0], month_list[-1]))
 
-    # чтение DataFrame
+    # чтение запроса в DataFrame
     df = read_frame(
         qs,
         fieldnames=[
             'booking__project_member__employee',
-            #'booking__project_member__project__short_name',
             'month',
             'load',
             'volume'
         ]
     )
 
+    # агрегирование по сотрудникам и месяцам (проекты будут выкинуты, побочный столбец)
     month_booking = df.groupby(['booking__project_member__employee', 'month']).sum()
 
     if month_booking.empty:
         return []
 
+    # генератор последовательности словарей с полями: 
+    # сотрудник, список помесячных записей о его загрузке
+    # отсутствующие данные заполняются нулями
     return (
         {
-            'name': e, 
-            'booking': [
-                {
-                    'load':booking.ix[e].load.get(month, 0),
-                    'volume':booking.ix[e].volume.get(month, 0)
-                } for month in month_list
-            ]
+            'name': e,
+            'booking': booking.reset_index(level=0, drop=True).reindex(month_list, fill_value=0).to_dict('records')
+            # замена следующего кода:
+            # [
+            #    {
+            #        'load':booking.ix[e].load.get(month, 0),
+            #        'volume':booking.ix[e].volume.get(month, 0)
+            #    } for month in month_list
+            # ]
         } for e, booking in month_booking.groupby(level='booking__project_member__employee')
     )

@@ -381,8 +381,9 @@ class ProjectMember(md.Model):
         '''
         Среднемесячная загрузка
         '''
-        return MonthBooking.objects.filter(
+        load = MonthBooking.objects.filter(
             booking__project_member=self).aggregate(md.Avg('load'))['load__avg']
+        return load if load else 0
     load.short_description = 'Средн.мес., %'
 
     def load_str(self):
@@ -481,12 +482,12 @@ class MonthBooking(md.Model):
     month_str.short_description = 'Месяц'
 
     def load_str(self):
-        return f'{self.load:n}%'
+        return f'{self.load:n}'
     load_str.short_description = 'Загрузка %'
 
     def volume_str(self):
         return f'{self.volume:n}'
-    volume_str.short_description = 'Трудоемкость, чел.дн'
+    volume_str.short_description = 'Объем, чел.дн'
 
     def __str__(self):
         return f'Месяц: {self.month_str()}: {self.days} дней, {self.load_str()}, {self.volume_str()} чел.дн.'
