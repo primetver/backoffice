@@ -461,10 +461,9 @@ class MonthBooking(md.Model):
     class Meta():
         verbose_name = 'месячная загрузка'
         verbose_name_plural = 'статистика месячной загрузки'
-        ordering = ()
     
     booking = md.ForeignKey(Booking, on_delete=md.CASCADE, verbose_name='Запись по загрузке')
-    month = md.DateField('Месяц') # число месяца всегда должно быть == 1
+    month = md.DateField('Месяц', db_index=True) # число месяца всегда должно быть == 1
     days = md.IntegerField('Участие, дней')
     load = md.FloatField('Загрузка, %', default=0) 
     volume = md.FloatField('Объем, чел.дн.', default=0)

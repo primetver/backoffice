@@ -7,6 +7,9 @@ from .models import (Booking, Business, Division, Employee,
                      Role, Salary, StaffingTable)
 
 from django_pandas.io import read_frame
+import itertools as it
+
+from datetime import date
 
 
 admin.AdminSite.site_header = 'Тверской филиал'
@@ -140,20 +143,44 @@ class MonthBookingAdmin(admin.ModelAdmin):
     '''
     Отчет по месячной загрузке сотрудников
     '''
+    
+    # Столбцов в отчете
+    COLUMNS = 18
+
+    # Фильтр отображения по годам
+    class YearFilter(admin.SimpleListFilter):
+        # Human-readable title which will be displayed in the
+        # right admin sidebar just above the filter options.
+        title = 'Данные за год'
+
+        # Parameter for the filter that will be used in the URL query.
+        parameter_name = 'year'
+
+        def lookups(self, request, model_admin):
+            qs = model_admin.get_queryset(request).order_by('month')
+
+            first_year = qs.first().month.year
+            last_year = qs.last().month.year
+            
+            return ( (year, year) for year in range(first_year, last_year + 1) )
+
+        def queryset(self, request, queryset):
+            # не фильтруем, фильтр по датам вычисляется в changelist_view()    
+            return queryset
+
 
     list_display_links = None
     list_filter = (
+        YearFilter,
         'booking__project_member__project__short_name',
         'booking__project_member__role__role',
         'booking__project_member__project__state',
         'booking__project_member__project__budget_state'
     )
     change_list_template = 'admin/booking_summary_change_list.html'
-    #date_hierarchy = 'booking__project_member__project__start_date'
 
     # Данные месячной загрузки можно только смотреть или удалить (через связанный объект)
     def has_add_permission(self, request, extra_context=None): return False
-
     def has_change_permission(self, request, extra_context=None): return False
 
     # Изменение отображения списка сотрудников и месячной загруженности в проекте
@@ -164,18 +191,24 @@ class MonthBookingAdmin(admin.ModelAdmin):
         )
 
         try:
-            qs = response.context_data['cl'].queryset
+            cl = response.context_data['cl']
+            qs = cl.queryset
+            year = cl.get_filters_params().get("year", None)
         except (AttributeError, KeyError):
             return response
 
-        before = 6
-        count = 12 + before
-        month_from = today().replace(day=1) - monthdelta(before)
-        month_list = [month_from + monthdelta(i) for i in range(count)]
+        if year:
+            month_from = date(int(year), 1, 1)
+        else:
+            month_from = today().replace(day=1) - monthdelta(MonthBookingAdmin.COLUMNS - 12)
+
+        month_list = [month_from + monthdelta(i) for i in range(MonthBookingAdmin.COLUMNS)]
+        
+        # фильтр на диапазон дат из списка для отображения
+        qs = qs.filter(month__range=(month_list[0], month_list[-1]))
 
         response.context_data['months'] = month_list
-        response.context_data['summary'] = get_booking_summary(
-            qs, month_list=month_list)
+        response.context_data['summary'] = get_booking_summary(qs, month_list=month_list)
         response.context_data['projects'] = set(qs.values_list(
             'booking__project_member__project__short_name', flat=True))
 
@@ -183,14 +216,8 @@ class MonthBookingAdmin(admin.ModelAdmin):
 
 
 # Вспомогательная функция формирования набора данных для отображения
-def get_booking_summary(qs, month_list=None):
-    month_list = month_list if month_list else [today().replace(day=1)]
-
-    # ограничение запроса заданным диапазоном интересующих нас месяцев, если они заданы
-    if month_list:
-        qs = qs.filter(month__range=(month_list[0], month_list[-1]))
-
-    # чтение запроса в DataFrame
+def get_booking_summary(qs, month_list):
+    # чтение запроса в фрейм
     df = read_frame(
         qs,
         fieldnames=[
@@ -201,20 +228,22 @@ def get_booking_summary(qs, month_list=None):
         ]
     )
 
-    # агрегирование по сотрудникам и месяцам (проекты будут выкинуты, побочный столбец)
+    # агрегирование по сотрудникам и месяцам, получаем фрейм с иерархическим индексом
     month_booking = df.groupby(['booking__project_member__employee', 'month']).sum()
 
     if month_booking.empty:
         return []
 
-    # генератор последовательности словарей с полями: 
-    # сотрудник, список помесячных записей о его загрузке
-    # отсутствующие данные заполняются нулями
+    # результат - генератор последовательности словарей с полями: 
+    #   - сотрудник, 
+    #   - список помесячных записей о его загрузке для каждого месяца из переданного списка
+    #     (отсутствующие данные заполняются нулями)
     return (
         {
             'name': e,
+            # сбрасываем индекс по сотруднику, переиндексируем по списку месяцев, выводим в список словарей
             'booking': booking.reset_index(level=0, drop=True).reindex(month_list, fill_value=0).to_dict('records')
-            # замена следующего кода:
+            # это замена примерно следующего кода:
             # [
             #    {
             #        'load':booking.ix[e].load.get(month, 0),
