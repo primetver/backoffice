@@ -11,7 +11,7 @@ from monthdelta import monthdelta, monthmod
 from phonenumber_field.modelfields import PhoneNumberField
 
 from .datautils import today, tomorrow, volume, workdays
-
+from .proxy_perm_create import proxy_perm_create
 
 # Create your models here.
 
@@ -43,7 +43,7 @@ class Position(md.Model):
     Должность (без привязки к подразделениям)
     '''
     class Meta():
-        verbose_name = 'должности'
+        verbose_name = 'должность'
         verbose_name_plural = 'должности'
         ordering = ('name',)
 
@@ -65,8 +65,8 @@ class StaffingTable(md.Model):
     Штатное расписание
     '''
     class Meta():
-        verbose_name = 'должность по штатному расписанию'
-        verbose_name_plural = 'должности по штатному расписанию'
+        verbose_name = 'позиция штатного расписанию'
+        verbose_name_plural = 'позиции штатного расписания'
         unique_together = (('position', 'division'),)
         ordering = ('division', 'position')
 
@@ -277,7 +277,7 @@ class Project(md.Model):
     BUDGET_APPROVED = 'AP'
     # Выбор статусов
     BUDGET_STATE_CHOICES = (
-        (BUDGET_NONE, 'Бюджет планируется'),
+        (BUDGET_NONE, 'Бюджет отсутствует'),
         (BUDGET_PROJECT, 'Бюджет согласуется'),
         (BUDGET_APPROVED, 'Бюджет утвержден')
     )
@@ -428,14 +428,14 @@ class Booking(md.Model):
         ordering = ('project_member', 'start_date')
 
     # Статусы
-    DRAFT = 'DR'
+    #DRAFT = 'DR'
     PLAN = 'PL'
-    FACT = 'FA'
+    #FACT = 'FA'
     # Перечень статусов
     BOOKING_STATE_CHOICES = (
-        (DRAFT, 'Черновик'),
+    #    (DRAFT, 'Черновик'),
         (PLAN, 'Планируемое участие'),
-        (FACT, 'Фактическое участие')
+    #    (FACT, 'Фактическое участие')
     )
 
     project_member = md.ForeignKey(ProjectMember, on_delete=md.CASCADE, verbose_name='Участник проекта')
@@ -454,7 +454,7 @@ class Booking(md.Model):
 
 class MonthBooking(md.Model):
     ''' 
-    Месячная загрузка участника проекта
+    Загрузка сотрудников по месяцам
 
     Данная модель заполняется автоматически
     '''
@@ -530,3 +530,15 @@ def update_month_booking(sender, instance, **kwargs):
             load=load,
             volume=vol)
         month_booking.save()
+
+
+class ProjectBooking(MonthBooking):
+    ''' 
+    Загрузка сотрудников по проектам
+
+    Прокси-модель для отчета по загрузки сотрудников по проектам за выбранный месяц
+    '''
+    class Meta():
+        proxy = True
+        verbose_name = 'загрузка по проектам'
+        verbose_name_plural = 'статистика загрузки по проектам'

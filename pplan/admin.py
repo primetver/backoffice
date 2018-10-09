@@ -1,16 +1,13 @@
-from django.contrib import admin
-from monthdelta import monthdelta, monthmod
-
-from .datautils import today
-from .models import (Booking, Business, Division, Employee,
-                     MonthBooking, Passport, Position, Project, ProjectMember,
-                     Role, Salary, StaffingTable)
-
-from django_pandas.io import read_frame
-import itertools as it
-
 from datetime import date
 
+from django.contrib import admin
+from django_pandas.io import read_frame
+from monthdelta import monthdelta, monthmod
+
+from .datautils import today, months
+from .models import (Booking, Business, Division, Employee, MonthBooking,
+                     Passport, Position, Project, ProjectBooking,
+                     ProjectMember, Role, Salary, StaffingTable)
 
 admin.AdminSite.site_header = 'Тверской филиал'
 
@@ -138,15 +135,10 @@ class ProjectMemberAdmin(admin.ModelAdmin):
     date_hierarchy = 'project__start_date'
 
 
-@admin.register(MonthBooking)
-class MonthBookingAdmin(admin.ModelAdmin):
+class BaseBookingAdmin(admin.ModelAdmin):
     '''
-    Отчет по месячной загрузке сотрудников
+    Базовый класс для сводных отчетов по месячной загрузке
     '''
-    
-    # Столбцов в отчете
-    COLUMNS = 18
-
     # Фильтр отображения по годам
     class YearFilter(admin.SimpleListFilter):
         # Human-readable title which will be displayed in the
@@ -168,22 +160,34 @@ class MonthBookingAdmin(admin.ModelAdmin):
             # не фильтруем, фильтр по датам вычисляется в changelist_view()    
             return queryset
 
-
     list_display_links = None
+    list_filter = (YearFilter,)
+    
+    # Данные месячной загрузки можно только смотреть или удалить (через связанный объект)
+    def has_add_permission(self, request, extra_context=None): return False
+    def has_change_permission(self, request, extra_context=None): return False
+
+
+
+@admin.register(MonthBooking)
+class MonthBookingAdmin(BaseBookingAdmin):
+    '''
+    Отчет по месячной загрузке сотрудников
+    '''
+    # Столбцов в отчете
+    COLUMNS = 18
+
+    change_list_template = 'admin/booking_summary_change_list.html'
+
     list_filter = (
-        YearFilter,
+        BaseBookingAdmin.YearFilter,
         'booking__project_member__project__short_name',
         'booking__project_member__role__role',
         'booking__project_member__project__state',
         'booking__project_member__project__budget_state'
     )
-    change_list_template = 'admin/booking_summary_change_list.html'
-
-    # Данные месячной загрузки можно только смотреть или удалить (через связанный объект)
-    def has_add_permission(self, request, extra_context=None): return False
-    def has_change_permission(self, request, extra_context=None): return False
-
-    # Изменение отображения списка сотрудников и месячной загруженности в проекте
+    
+    # Отображение списка сотрудников и месячной загруженности
     def changelist_view(self, request, extra_context=None):
         response = super().changelist_view(
             request,
@@ -214,8 +218,7 @@ class MonthBookingAdmin(admin.ModelAdmin):
 
         return response
 
-
-# Вспомогательная функция формирования набора данных для отображения
+# Формирование набора данных для отображения загруженности по месяцам
 def get_booking_summary(qs, month_list):
     # чтение запроса в фрейм
     df = read_frame(
@@ -252,3 +255,105 @@ def get_booking_summary(qs, month_list):
             # ]
         } for e, booking in month_booking.groupby(level='booking__project_member__employee')
     )
+
+
+@admin.register(ProjectBooking)
+class ProjectBookingAdmin(BaseBookingAdmin):
+    '''
+    Отчет по загрузке сотрудников в проектах
+    '''
+    # Фильтр отображения по годам
+    class MonthFilter(admin.SimpleListFilter):
+        title = 'Месяц'
+        parameter_name = 'month'
+
+        def lookups(self, request, model_admin):
+            return months()
+
+        def queryset(self, request, queryset):
+            # не фильтруем, фильтр по датам вычисляется в changelist_view()    
+            return queryset
+    
+    change_list_template = 'admin/booking_projects_change_list.html'
+    
+    list_filter = (
+        BaseBookingAdmin.YearFilter,
+        MonthFilter,
+        'booking__project_member__project__state',
+        'booking__project_member__project__budget_state'
+    )
+
+    # Отображение списка сотрудников и загруженности в проектах
+    def changelist_view(self, request, extra_context=None):
+        response = super().changelist_view(
+            request,
+            extra_context=extra_context
+        )
+
+        try:
+            cl = response.context_data['cl']
+            qs = cl.queryset
+            year = cl.get_filters_params().get("year", None)
+            month_num = cl.get_filters_params().get("month", None)
+        except (AttributeError, KeyError):
+            return response
+
+        month = today().replace(day=1)
+
+        # Извлечение значений из фильтра
+        try:
+            month = month.replace(year=int(year))
+        except (TypeError, ValueError):
+            pass
+
+        try:
+            month = month.replace(month=int(month_num))
+        except (TypeError, ValueError):
+            pass
+
+        # фильтр на дату для отображения
+        qs = qs.filter(month__exact=month)
+        projects = set(qs.values_list(
+            'booking__project_member__project__short_name', flat=True))
+
+        response.context_data['month'] = month
+        response.context_data['summary'] = get_booking_projects(qs, projects)
+        response.context_data['projects'] = projects
+
+        return response
+
+# Формирование набора данных для отображения загруженности по месяцам
+def get_booking_projects(qs, projects):
+    # чтение запроса в фрейм
+    df = read_frame(
+        qs,
+        fieldnames=[
+            'booking__project_member__employee',
+            'booking__project_member__project__short_name',
+            'load',
+            'volume'
+        ]
+    )
+
+    # агрегирование по сотрудникам и проектам, получаем фрейм с иерархическим индексом
+    project_booking = df.groupby([
+        'booking__project_member__employee', 
+        'booking__project_member__project__short_name']).sum()
+    
+    if project_booking.empty:
+        return []
+
+    # результат - генератор последовательности словарей с полями: 
+    #   - сотрудник, 
+    #   - список записей о его загрузке для каждого проекта из переданного списка
+    #     (отсутствующие данные заполняются нулями),
+    #   - запись о суммарной загрузке
+    return [
+        {
+            'name': e,
+            # сбрасываем индекс по сотруднику, 
+            # переиндексируем по списку проектов, выводим в список словарей
+            'booking': booking.reset_index(level=0, drop=True).reindex(projects, fill_value=0).to_dict('records'),
+            'total': booking.sum().to_dict()
+        } for e, booking in project_booking.groupby(level='booking__project_member__employee')
+    ]

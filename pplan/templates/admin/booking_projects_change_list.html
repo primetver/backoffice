@@ -1,0 +1,54 @@
+{% extends 'admin/change_list.html' %}
+
+{% block content_title %}
+    <h1>Статистика загрузки по проектам за {{ month | date:"F Y" }}, %</h1>
+{% endblock %}
+
+{% block result_list %}
+
+<div class="results">
+  <table>
+    <thead>
+      <tr>
+        <th>
+          <div class="text">
+            <a href="#">Участник проекта</a>
+          </div>
+        </th>
+        {% for p in projects %}
+        <th>
+          <div class="text" align="right">
+            <a href="#">{{ p }}</a>
+          </div>
+        </th>
+        {% endfor %}
+        <th>
+            <div class="text" align="right">
+                <a href="#">Всего за {{ month | date:"F Y" }}</a>
+            </div>
+          </th>
+      </tr>
+    </thead>
+    <tbody>
+        {% for row in summary %}
+        <tr class="{% cycle 'row1' 'row2' %}">
+            <td> {{ row.name }} </td>
+            {% for b in row.booking %}
+            <td align="right">
+                {{ b.load | default:'' | floatformat:2 }}
+            </td>
+            {% endfor %}
+            <td align="right">
+                {% if row.total.load < 100 %}<strong>{% endif %}
+                {{ row.total.load | default:'' | floatformat:2 }}
+                {% if row.total.load < 100 %}</strong>{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+  </table>
+</div>
+
+{% endblock %}
+
+{% block pagination %}{% endblock %}
