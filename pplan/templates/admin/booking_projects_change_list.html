@@ -16,32 +16,61 @@
           </div>
         </th>
         {% for p in projects %}
-        <th>
+        <th colspan="2">
           <div class="text" align="right">
             <a href="#">{{ p }}</a>
           </div>
         </th>
         {% endfor %}
-        <th>
+        <th colspan="2">
             <div class="text" align="right">
                 <a href="#">Всего за {{ month | date:"F Y" }}</a>
             </div>
-          </th>
+        </th>
+      </tr>
+      <tr>
+        <th></th>
+        {% for p in projects %}
+        <th>
+          <div class="text" align="right">
+            <a href="#">%</a>
+          </div>
+        </th>
+        <th>
+          <div class="text" align="right">
+            <a href="#">руб.</a>
+          </div>
+        </th>
+        {% endfor %}
+        <th>
+          <div class="text" align="right">
+            <a href="#">%</a>
+          </div>
+        </th>
+        <th>
+          <div class="text" align="right">
+            <a href="#">руб.</a>
+          </div>
+        </th>
       </tr>
     </thead>
     <tbody>
         {% for row in summary %}
         <tr class="{% cycle 'row1' 'row2' %}">
-            <td> {{ row.name }} </td>
+            <td>{{ row.name }}</td>
             {% for b in row.booking %}
             <td align="right">
-                {{ b.load | default:'' | floatformat:2 }}
+                <strong>{{ b.load | default:'' | floatformat:2 }}</strong>
+            </td>
+            <td align="right">
+                {{ b.cost | default:'' | floatformat:2 }}
             </td>
             {% endfor %}
             <td align="right">
-                {% if row.total.load < 100 %}<strong>{% endif %}
-                {{ row.total.load | default:'' | floatformat:2 }}
-                {% if row.total.load < 100 %}</strong>{% endif %}
+                <strong>{{ row.total.load | default:'' | floatformat:2 }}</strong>
+            </td>
+            <td align="right">
+                {{ row.total.cost | default:'' | floatformat:2 }}
             </td>
         </tr>
         {% endfor %}

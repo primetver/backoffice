@@ -193,7 +193,6 @@ class Salary(md.Model):
     def __str__(self):
         return f'{self.employee}, оклад: {self.amount} р., изменен {self.start_date:%d.%m.%Y}'
     
-    # pylint: disable=no-member
     def clean(self):
         # validate salary dates
         if self.start_date < self.employee.hire_date:               
@@ -459,8 +458,8 @@ class MonthBooking(md.Model):
     Данная модель заполняется автоматически
     '''
     class Meta():
-        verbose_name = 'месячная загрузка'
-        verbose_name_plural = 'статистика месячной загрузки'
+        verbose_name = 'загрузка по месяцам'
+        verbose_name_plural = 'статистика загрузки по месяцам'
     
     booking = md.ForeignKey(Booking, on_delete=md.CASCADE, verbose_name='Запись по загрузке')
     month = md.DateField('Месяц', db_index=True) # число месяца всегда должно быть == 1
