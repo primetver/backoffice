@@ -364,7 +364,7 @@ def get_booking_projects(qs, projects, salary_month=None):
     #   - список записей о его загрузке для каждого проекта из переданного списка
     #     (отсутствующие данные заполняются нулями),
     #   - запись о суммарной загрузке
-    return [
+    return (
         {
             'name': e,
             # сбрасываем индекс по сотруднику, 
@@ -372,4 +372,4 @@ def get_booking_projects(qs, projects, salary_month=None):
             'booking': booking.reset_index(level=0, drop=True).reindex(projects, fill_value=0).to_dict('records'),
             'total': booking.sum().to_dict()
         } for e, booking in project_booking.groupby(level='booking__project_member__employee')
-    ]
+    )
