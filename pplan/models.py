@@ -303,9 +303,19 @@ class Project(md.Model):
         return s
     lead.short_description = 'Руководитель'
 
+    def volume(self):
+        volume = MonthBooking.objects.filter(
+            booking__project_member__project=self).aggregate(md.Sum('volume'))['volume__sum']
+        return volume if volume else 0
+    volume.short_description = 'Трудоемкость, чел.дн.'
+
+    def volume_str(self):
+        return f'{self.volume():n}'
+    volume_str.short_description = volume.short_description
+
     def member_count(self):
         return self.projectmember_set.count()
-    member_count.short_description = 'Число участников'
+    member_count.short_description = 'Участников'
 
     def __str__(self):
         return f'{self.business}, {self.short_name}'

@@ -94,7 +94,7 @@ class ProjectAdmin(admin.ModelAdmin):
     Администрирование проекта и рабочей группы
     '''
     inlines = [ProjectMemberInline]
-    list_display = ('__str__', 'lead', 'member_count',
+    list_display = ('__str__', 'lead', 'member_count', 'volume_str',
                     'start_date', 'finish_date', 'state')
     list_filter = ('business__name', 'state', 'budget_state')
 
