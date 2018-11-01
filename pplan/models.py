@@ -1,6 +1,8 @@
 # pylint: disable=no-member
 from datetime import timedelta
 
+from django_pandas.io import read_frame
+
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models as md
@@ -303,15 +305,27 @@ class Project(md.Model):
         return s
     lead.short_description = 'Руководитель'
 
+    # трудозатраты в чел.дн. считаются из объема месячной загрузки всех участниклов проекта
     def volume(self):
         volume = MonthBooking.objects.filter(
             booking__project_member__project=self).aggregate(md.Sum('volume'))['volume__sum']
-        return volume if volume else 0
+        return volume or 0
     volume.short_description = 'Трудоемкость, чел.дн.'
 
     def volume_str(self):
         return f'{self.volume():n}'
     volume_str.short_description = volume.short_description
+
+    # трудозатраты в чел.мес. считаются из % месячной загрузки всех участников проекта 
+    def month_volume(self):
+        volume = MonthBooking.objects.filter(
+            booking__project_member__project=self).aggregate(md.Sum('load'))['load__sum']
+        return volume / 100 or 0
+    month_volume.short_description = 'Трудоемкость, чел.мес.'
+
+    def month_volume_str(self):
+        return f'{self.month_volume():n}'
+    month_volume_str.short_description = month_volume.short_description
 
     def member_count(self):
         return self.projectmember_set.count()
@@ -392,7 +406,7 @@ class ProjectMember(md.Model):
         '''
         load = MonthBooking.objects.filter(
             booking__project_member=self).aggregate(md.Avg('load'))['load__avg']
-        return load if load else 0
+        return load or 0
     load.short_description = 'Средн.мес., %'
 
     def load_str(self):
@@ -463,13 +477,13 @@ class Booking(md.Model):
 
 class MonthBooking(md.Model):
     ''' 
-    Загрузка сотрудников по месяцам
+    Базовая модель для хранения данных о плановой загрузке сотрудников по месяцам
 
     Данная модель заполняется автоматически
     '''
     class Meta():
-        verbose_name = 'загрузка по месяцам'
-        verbose_name_plural = 'статистика загрузки по месяцам'
+        verbose_name = 'плановая загрузка за месяц'
+        verbose_name_plural = 'данные плановой загрузки по месяцам'
     
     booking = md.ForeignKey(Booking, on_delete=md.CASCADE, verbose_name='Запись по загрузке')
     month = md.DateField('Месяц', db_index=True) # число месяца всегда должно быть == 1
@@ -541,13 +555,134 @@ def update_month_booking(sender, instance, **kwargs):
         month_booking.save()
 
 
+class MonthBookingSummary(MonthBooking):
+    ''' 
+    Прокси-модель для сводного отчета о загрузке сотрудников по месяцам
+    '''
+    class Meta():
+        proxy = True
+        verbose_name = 'загрузка по месяцам'
+        verbose_name_plural = 'сводный отчет о загрузке по месяцам'
+
+    class Manager(md.Manager):
+        def get_queryset(self):
+            return MonthBookingSummary.QuerySet(self.model, using=self._db)
+
+    # замена менеджера по умолчанию
+    objects = Manager()
+
+    class QuerySet(md.QuerySet):
+        '''
+        Дополненный класс запроса для вывода загруженности по месяцам
+        '''
+        # Формирование набора данных по месяцам
+        def get_booking(self, month_list):
+            # чтение запроса в фрейм
+            df = read_frame(
+                self,
+                fieldnames=[
+                    'booking__project_member__employee',
+                    'month',
+                    'load',
+                    'volume'
+                ]
+            )
+            if df.empty: return []
+
+            # агрегирование по сотрудникам и месяцам, получаем фрейм с иерархическим индексом
+            month_booking = df.groupby(['booking__project_member__employee', 'month']).sum()
+
+            # результат - генератор последовательности словарей с полями: 
+            #   - сотрудник, 
+            #   - список помесячных записей о его загрузке для каждого месяца из переданного списка
+            #     (отсутствующие данные заполняются нулями)
+            return (
+                {
+                    'name': e,
+                    # сбрасываем индекс по сотруднику, переиндексируем по списку месяцев, выводим в список словарей
+                    'booking': booking.reset_index(level=0, drop=True).reindex(month_list, fill_value=0).to_dict('records')
+                    # это замена примерно следующего кода:
+                    # [
+                    #    {
+                    #        'load':booking.ix[e].load.get(month, 0),
+                    #        'volume':booking.ix[e].volume.get(month, 0)
+                    #    } for month in month_list
+                    # ]
+                } for e, booking in month_booking.groupby(level='booking__project_member__employee')
+            )
+
+
 class ProjectBooking(MonthBooking):
     ''' 
-    Загрузка сотрудников по проектам
-
-    Прокси-модель для отчета по загрузки сотрудников по проектам за выбранный месяц
+    Прокси-модель для отчета о загрузке сотрудников по проектам за выбранный месяц
     '''
     class Meta():
         proxy = True
         verbose_name = 'загрузка по проектам'
-        verbose_name_plural = 'статистика загрузки по проектам'
+        verbose_name_plural = 'отчет о загрузке по проектам'
+
+    class Manager(md.Manager):
+        def get_queryset(self):
+            return ProjectBooking.QuerySet(self.model, using=self._db)
+
+    # замена менеджера по умолчанию
+    objects = Manager()
+
+    class QuerySet(md.QuerySet):
+        '''
+        Дополненный класс запроса для вывода загруженности по проектам
+        '''
+        # Формирование набора данных по проектам с возможностью вывода данных по выплатам 
+        def get_booking(self, projects, salary_month=None):
+            # чтение запроса в фрейм
+            df = read_frame(
+                self,
+                fieldnames=[
+                    'booking__project_member__employee',
+                    'booking__project_member__project__short_name',
+                    'load',
+                    'volume',            
+                ],
+                index_col = 'booking__project_member__employee__id'
+            )
+            if df.empty: return []
+
+            if salary_month:
+                # чтение данных по з/п, выбор актуальных на заданный месяц
+                sdf = read_frame(
+                    # pylint: disable=no-member
+                    Salary.objects.filter(start_date__lte=salary_month),
+                    fieldnames=[
+                        'employee__id',
+                        'employee__business_k',
+                        'amount'
+                    ]
+                ).groupby(['employee__id']).first()
+
+                # обогащение набора данных и расчет оплаты в соответствии с загрузкой
+                df = df.join(sdf)
+                df['cost'] =  df['load'] * df['amount'] * df['employee__business_k'] / 100
+
+                # удаление ненужного столбца
+                del df['amount'], df['employee__business_k']
+
+            # агрегирование по сотрудникам и проектам, получаем фрейм с иерархическим индексом
+            project_booking = df.groupby([
+                'booking__project_member__employee', 
+                'booking__project_member__project__short_name']).sum()
+            
+            # результат - генератор последовательности словарей с полями: 
+            #   - сотрудник, 
+            #   - список записей о его загрузке для каждого проекта из переданного списка
+            #     (отсутствующие данные заполняются нулями),
+            #   - запись о суммарной загрузке
+            return (
+                {
+                    'name': e,
+                    # сбрасываем индекс по сотруднику, 
+                    # переиндексируем по списку проектов, выводим в список словарей
+                    'booking': booking.reset_index(level=0, drop=True).reindex(projects, fill_value=0).to_dict('records'),
+                    'total': booking.sum().to_dict()
+                } for e, booking in project_booking.groupby(level='booking__project_member__employee')
+            )
+
