@@ -15,6 +15,8 @@ from phonenumber_field.modelfields import PhoneNumberField
 from .datautils import today, tomorrow, volume, workdays
 from .proxy_perm_create import proxy_perm_create
 
+import itertools as it
+
 # Create your models here.
 
 class Division(md.Model):
@@ -562,7 +564,7 @@ class MonthBookingSummary(MonthBooking):
     class Meta():
         proxy = True
         verbose_name = 'загрузка по месяцам'
-        verbose_name_plural = 'сводный отчет о загрузке по месяцам'
+        verbose_name_plural = 'отчет о загрузке по месяцам'
 
     class Manager(md.Manager):
         def get_queryset(self):
@@ -614,7 +616,7 @@ class MonthBookingSummary(MonthBooking):
 
 class ProjectBooking(MonthBooking):
     ''' 
-    Прокси-модель для отчета о загрузке сотрудников по проектам за выбранный месяц
+    Прокси-модель для отчета о загрузке сотрудников по проектам
     '''
     class Meta():
         proxy = True
@@ -632,7 +634,7 @@ class ProjectBooking(MonthBooking):
         '''
         Дополненный класс запроса для вывода загруженности по проектам
         '''
-        # Формирование набора данных по проектам с возможностью вывода данных по выплатам 
+        # Формирование набора данных по проектам с возможностью вывода данных по выплатам за указанный месяц
         def get_booking(self, projects, salary_month=None):
             # чтение запроса в фрейм
             df = read_frame(
@@ -686,3 +688,66 @@ class ProjectBooking(MonthBooking):
                 } for e, booking in project_booking.groupby(level='booking__project_member__employee')
             )
 
+
+class MonthBookingEmployee(MonthBooking):
+    ''' 
+    Прокси-модель для отчета о загрузке выбранного сотрудника
+    '''
+    class Meta():
+        proxy = True
+        verbose_name = 'загрузка по сотруднику'
+        verbose_name_plural = 'отчет о загрузке по сотруднику'
+
+    class Manager(md.Manager):
+        def get_queryset(self):
+            return MonthBookingEmployee.QuerySet(self.model, using=self._db)
+
+    # замена менеджера по умолчанию
+    objects = Manager()
+
+    class QuerySet(md.QuerySet):
+        '''
+        Дополненный класс запроса для вывода загруженности по сотруднику
+        '''
+        # Формирование набора данных по сотруднику 
+        def get_booking(self, month_list, employee_id):
+            # фильтрация запроса
+            qs = self.filter(
+                month__range=(month_list[0], month_list[-1]), 
+                booking__project_member__employee__id=employee_id
+            )
+
+            # чтение запроса в фрейм
+            df = read_frame(
+                qs,
+                fieldnames=[
+                    'booking__project_member__project__short_name',
+                    'month',
+                    'load',
+                    'volume',            
+                ],
+            )
+            if df.empty: return [], None
+
+            # агрегирование по проектам и месяцам, получаем фрейм с иерархическим индексом: проект, месяц
+            month_booking = df.groupby(['booking__project_member__project__short_name', 'month']).sum()
+
+            # результат -- кортеж:
+            # 1) генератор последовательности словарей с полями: 
+            #   - проект, 
+            #   - список помесячных записей о загрузке для каждого месяца из переданного списка
+            #     (отсутствующие данные заполняются нулями)
+            # 2) итоговая строка 
+            return (
+                (
+                    {
+                        'project': p,
+                        # сбрасываем индекс по проектам, переиндексируем по списку месяцев, выводим в список словарей
+                        'booking': booking.reset_index(level=0, drop=True).reindex(month_list, fill_value=0).to_dict('records')
+                    } for p, booking in month_booking.groupby(level='booking__project_member__project__short_name')
+                ),
+                {
+                    # дополнительная итоговая строка 
+                    'booking': month_booking.groupby('month').sum().reindex(month_list, fill_value=0).to_dict('records')
+                }
+            )
