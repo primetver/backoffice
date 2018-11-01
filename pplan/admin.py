@@ -4,7 +4,7 @@ from django.contrib import admin
 from monthdelta import monthdelta, monthmod
 
 from .datautils import today, months
-from .models import (Booking, Business, Division, Employee, MonthBookingSummary,
+from .models import (Booking, Business, Division, Employee, MonthBookingSummary, MonthBookingEmployee,
                      Passport, Position, Project, ProjectBooking,
                      ProjectMember, Role, Salary, StaffingTable)
 
@@ -171,7 +171,7 @@ class BaseBookingAdmin(admin.ModelAdmin):
 @admin.register(MonthBookingSummary)
 class MonthBookingAdmin(BaseBookingAdmin):
     '''
-    Отчет по месячной загрузке сотрудников
+    Отчет о месячной загрузке сотрудников
     '''
     # Столбцов в отчете
     COLUMNS = 18
@@ -220,7 +220,7 @@ class MonthBookingAdmin(BaseBookingAdmin):
 @admin.register(ProjectBooking)
 class ProjectBookingAdmin(BaseBookingAdmin):
     '''
-    Отчет по загрузке сотрудников в проектах
+    Отчет о загрузке сотрудников в проектах
     '''
     # Фильтр отображения по годам
     class MonthFilter(admin.SimpleListFilter):
@@ -281,4 +281,50 @@ class ProjectBookingAdmin(BaseBookingAdmin):
         response.context_data['summary'] = qs.get_booking(projects, month)
         response.context_data['projects'] = projects
 
+        return response
+
+
+@admin.register(MonthBookingEmployee)
+class MonthBookingEmployeeAdmin(BaseBookingAdmin):
+    '''
+    Отчет о месячной загрузке сотрудника в проектах
+    '''
+    # Столбцов в отчете
+    COLUMNS = 18
+
+    change_list_template = 'admin/booking_employee_change_list.html'
+
+    list_filter = (
+        BaseBookingAdmin.YearFilter,
+        'booking__project_member__employee'
+    )
+    
+    # Отображение списка проектов и месячной загруженности по выбранному сотруднику
+    # если сотрудник не выбран - ничего не отобр    ажается 
+    def changelist_view(self, request, extra_context=None):
+        response = super().changelist_view(
+            request,
+            extra_context=extra_context
+        )
+
+        try:
+            cl = response.context_data['cl']
+            qs = cl.queryset
+            year = cl.get_filters_params().get("year", None)
+            employee_id = cl.get_filters_params().get('booking__project_member__employee__id__exact', None)
+        except (AttributeError, KeyError):
+            return response
+
+        if year:
+            month_from = date(int(year), 1, 1)
+        else:
+            month_from = today().replace(day=1) - monthdelta(MonthBookingAdmin.COLUMNS - 12)
+
+        month_list = [month_from + monthdelta(i) for i in range(MonthBookingAdmin.COLUMNS)]
+
+        # pylint: disable=no-member
+        response.context_data['months'] = month_list
+        response.context_data['member'] = Employee.objects.filter(id=employee_id).first()
+        response.context_data['summary'], response.context_data['total'] = qs.get_booking(month_list, employee_id)
+        
         return response
