@@ -300,7 +300,7 @@ class MonthBookingEmployeeAdmin(BaseBookingAdmin):
     )
     
     # Отображение списка проектов и месячной загруженности по выбранному сотруднику
-    # если сотрудник не выбран - ничего не отобр    ажается 
+    # если сотрудник не выбран - ничего не отображается 
     def changelist_view(self, request, extra_context=None):
         response = super().changelist_view(
             request,
