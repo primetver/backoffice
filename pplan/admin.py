@@ -1,11 +1,10 @@
 from datetime import date
 
 from django.contrib import admin
-from django_pandas.io import read_frame
 from monthdelta import monthdelta, monthmod
 
 from .datautils import today, months
-from .models import (Booking, Business, Division, Employee, MonthBooking,
+from .models import (Booking, Business, Division, Employee, MonthBookingSummary,
                      Passport, Position, Project, ProjectBooking,
                      ProjectMember, Role, Salary, StaffingTable)
 
@@ -169,7 +168,7 @@ class BaseBookingAdmin(admin.ModelAdmin):
 
 
 
-@admin.register(MonthBooking)
+@admin.register(MonthBookingSummary)
 class MonthBookingAdmin(BaseBookingAdmin):
     '''
     Отчет по месячной загрузке сотрудников
@@ -212,48 +211,11 @@ class MonthBookingAdmin(BaseBookingAdmin):
         qs = qs.filter(month__range=(month_list[0], month_list[-1]))
 
         response.context_data['months'] = month_list
-        response.context_data['summary'] = get_booking_summary(qs, month_list=month_list)
-        response.context_data['projects'] = set(qs.values_list(
-            'booking__project_member__project__short_name', flat=True))
+        response.context_data['summary'] = qs.get_booking(month_list)
+        response.context_data['projects'] = sorted(set(qs.values_list(
+            'booking__project_member__project__short_name', flat=True)))
 
         return response
-
-# Формирование набора данных для отображения загруженности по месяцам
-def get_booking_summary(qs, month_list):
-    # чтение запроса в фрейм
-    df = read_frame(
-        qs,
-        fieldnames=[
-            'booking__project_member__employee',
-            'month',
-            'load',
-            'volume'
-        ]
-    )
-    if df.empty: return []
-
-    # агрегирование по сотрудникам и месяцам, получаем фрейм с иерархическим индексом
-    month_booking = df.groupby(['booking__project_member__employee', 'month']).sum()
-
-    # результат - генератор последовательности словарей с полями: 
-    #   - сотрудник, 
-    #   - список помесячных записей о его загрузке для каждого месяца из переданного списка
-    #     (отсутствующие данные заполняются нулями)
-    return (
-        {
-            'name': e,
-            # сбрасываем индекс по сотруднику, переиндексируем по списку месяцев, выводим в список словарей
-            'booking': booking.reset_index(level=0, drop=True).reindex(month_list, fill_value=0).to_dict('records')
-            # это замена примерно следующего кода:
-            # [
-            #    {
-            #        'load':booking.ix[e].load.get(month, 0),
-            #        'volume':booking.ix[e].volume.get(month, 0)
-            #    } for month in month_list
-            # ]
-        } for e, booking in month_booking.groupby(level='booking__project_member__employee')
-    )
-
 
 @admin.register(ProjectBooking)
 class ProjectBookingAdmin(BaseBookingAdmin):
@@ -310,66 +272,13 @@ class ProjectBookingAdmin(BaseBookingAdmin):
             pass
 
         # фильтр на дату для отображения
+        # TODO: перенести в кастомный qs прокси-модели, упростить интерфейс get_booking
         qs = qs.filter(month__exact=month)
         projects = sorted(set(qs.values_list(
             'booking__project_member__project__short_name', flat=True)))
 
         response.context_data['month'] = month
-        response.context_data['summary'] = get_booking_projects(qs, projects, month)
+        response.context_data['summary'] = qs.get_booking(projects, month)
         response.context_data['projects'] = projects
 
         return response
-
-# Формирование набора данных для отображения загруженности по месяцам
-def get_booking_projects(qs, projects, salary_month=None):
-    # чтение запроса в фрейм
-    df = read_frame(
-        qs,
-        fieldnames=[
-            'booking__project_member__employee',
-            'booking__project_member__project__short_name',
-            'load',
-            'volume',            
-        ],
-        index_col = 'booking__project_member__employee__id'
-    )
-    if df.empty: return []
-
-    if salary_month:
-        # чтение данных по з/п, выбор актуальных на заданный месяц
-        sdf = read_frame(
-            # pylint: disable=no-member
-            Salary.objects.filter(start_date__lte=salary_month),
-            fieldnames=[
-                'employee__id',
-                'employee__business_k',
-                'amount'
-            ]
-        ).groupby(['employee__id']).first()
-
-        # обогащение набора данных и расчет оплаты в соответствии с загрузкой
-        df = df.join(sdf)
-        df['cost'] =  df['load'] * df['amount'] * df['employee__business_k'] / 100
-
-        # удаление ненужного столбца
-        del df['amount'], df['employee__business_k']
-
-    # агрегирование по сотрудникам и проектам, получаем фрейм с иерархическим индексом
-    project_booking = df.groupby([
-        'booking__project_member__employee', 
-        'booking__project_member__project__short_name']).sum()
-    
-    # результат - генератор последовательности словарей с полями: 
-    #   - сотрудник, 
-    #   - список записей о его загрузке для каждого проекта из переданного списка
-    #     (отсутствующие данные заполняются нулями),
-    #   - запись о суммарной загрузке
-    return (
-        {
-            'name': e,
-            # сбрасываем индекс по сотруднику, 
-            # переиндексируем по списку проектов, выводим в список словарей
-            'booking': booking.reset_index(level=0, drop=True).reindex(projects, fill_value=0).to_dict('records'),
-            'total': booking.sum().to_dict()
-        } for e, booking in project_booking.groupby(level='booking__project_member__employee')
-    )
