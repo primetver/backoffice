@@ -8,6 +8,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models as md
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.contrib.auth.models import User
 from django_pandas.io import read_frame
 from monthdelta import monthdelta, monthmod
 from phonenumber_field.modelfields import PhoneNumberField
@@ -104,6 +105,7 @@ class Employee(md.Model):
     last_name = md.CharField('Фамилия', max_length=200, db_index=True)
     first_name = md.CharField('Имя', max_length=200)
     sur_name = md.CharField('Отчество', max_length=200, blank=True)
+    user = md.OneToOneField(User, null=True, blank=True, on_delete=md.SET_NULL, verbose_name='Логин пользователя')
     division = md.ForeignKey(Division, null=True, on_delete=md.CASCADE, verbose_name='Подразделение')  
     position = md.ForeignKey(Position, null=True, on_delete=md.PROTECT, verbose_name='Занимаемая должность')
     hire_date = md.DateField('Дата приема на работу')
@@ -751,3 +753,13 @@ class MonthBookingEmployee(MonthBooking):
                     'booking': month_booking.groupby('month').sum().reindex(month_list, fill_value=0).to_dict('records')
                 }
             )
+
+
+class MonthBookingSelf(MonthBookingEmployee):
+    ''' 
+    Прокси-модель для отчета о собственной загрузке сотрудника
+    '''
+    class Meta():
+        proxy = True
+        verbose_name = 'собственная загрузка'
+        verbose_name_plural = 'отчет о собственной загрузке'
