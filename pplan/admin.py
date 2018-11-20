@@ -4,11 +4,14 @@ from django.contrib import admin
 from monthdelta import monthdelta, monthmod
 
 from .datautils import today, months
-from .models import (Booking, Business, Division, Employee, MonthBookingSummary, MonthBookingEmployee,
+from .models import (Booking, Business, Division, Employee, 
+                     MonthBookingSummary, MonthBookingEmployee, MonthBookingSelf,
                      Passport, Position, Project, ProjectBooking,
                      ProjectMember, Role, Salary, StaffingTable)
 
 admin.AdminSite.site_header = 'Тверской филиал'
+admin.AdminSite.site_url = None
+admin.AdminSite.index_title = 'Главная страница' 
 
 
 @admin.register(Division)
@@ -73,6 +76,7 @@ class EmployeeAdmin(admin.ModelAdmin):
              }),
         ('Дополнительные сведения'.upper(),
             {'fields': [
+                'user',
                 'birthday',
                 ('local_phone', 'work_phone', 'mobile_phone')],
              'classes': [
@@ -307,11 +311,17 @@ class MonthBookingEmployeeAdmin(BaseBookingAdmin):
             extra_context=extra_context
         )
 
+        # pylint: disable=no-member
+        current_employee = Employee.objects.filter(user=request.user).first()
+
         try:
             cl = response.context_data['cl']
             qs = cl.queryset
             year = cl.get_filters_params().get("year", None)
-            employee_id = cl.get_filters_params().get('booking__project_member__employee__id__exact', None)
+            employee_id = cl.get_filters_params().get(
+                'booking__project_member__employee__id__exact',
+                current_employee.id if current_employee else None
+                )
         except (AttributeError, KeyError):
             return response
 
@@ -322,9 +332,19 @@ class MonthBookingEmployeeAdmin(BaseBookingAdmin):
 
         month_list = [month_from + monthdelta(i) for i in range(MonthBookingAdmin.COLUMNS)]
 
-        # pylint: disable=no-member
         response.context_data['months'] = month_list
         response.context_data['member'] = Employee.objects.filter(id=employee_id).first()
         response.context_data['summary'], response.context_data['total'] = qs.get_booking(month_list, employee_id)
         
         return response
+
+@admin.register(MonthBookingSelf)
+class MonthBookingSelfAdmin(MonthBookingEmployeeAdmin):
+    '''
+    Отчет о собственной загрузке в проектах
+    '''
+
+    list_filter = (
+        BaseBookingAdmin.YearFilter,
+    )
+       
