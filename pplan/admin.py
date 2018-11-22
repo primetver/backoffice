@@ -142,6 +142,9 @@ class BaseBookingAdmin(admin.ModelAdmin):
     '''
     Базовый класс для сводных отчетов по месячной загрузке
     '''
+    # Столбцов в отчете
+    COLUMNS = 18
+
     # Фильтр отображения по годам
     class YearFilter(admin.SimpleListFilter):
         # Human-readable title which will be displayed in the
@@ -162,6 +165,19 @@ class BaseBookingAdmin(admin.ModelAdmin):
         def queryset(self, request, queryset):
             # не фильтруем, фильтр по датам вычисляется в changelist_view()    
             return queryset
+        
+        def choices(self, changelist):
+            yield {
+                'selected': self.value() is None,
+                'query_string': changelist.get_query_string(remove=[self.parameter_name]),
+                'display': 'Текущий',
+            }
+            for lookup, title in self.lookup_choices:
+                yield {
+                    'selected': self.value() == str(lookup),
+                    'query_string': changelist.get_query_string({self.parameter_name: lookup}),
+                    'display': title,
+                }
 
     list_display_links = None
     list_filter = (YearFilter,)
@@ -177,9 +193,6 @@ class MonthBookingAdmin(BaseBookingAdmin):
     '''
     Отчет о месячной загрузке сотрудников
     '''
-    # Столбцов в отчете
-    COLUMNS = 18
-
     change_list_template = 'admin/booking_summary_change_list.html'
 
     list_filter = (
@@ -207,9 +220,9 @@ class MonthBookingAdmin(BaseBookingAdmin):
         if year:
             month_from = date(int(year), 1, 1)
         else:
-            month_from = today().replace(day=1) - monthdelta(MonthBookingAdmin.COLUMNS - 12)
+            month_from = today().replace(day=1) - monthdelta(BaseBookingAdmin.COLUMNS - 12)
 
-        month_list = [month_from + monthdelta(i) for i in range(MonthBookingAdmin.COLUMNS)]
+        month_list = [month_from + monthdelta(i) for i in range(BaseBookingAdmin.COLUMNS)]
         
         # фильтр на диапазон дат из списка для отображения
         qs = qs.filter(month__range=(month_list[0], month_list[-1]))
@@ -237,6 +250,19 @@ class ProjectBookingAdmin(BaseBookingAdmin):
         def queryset(self, request, queryset):
             # не фильтруем, фильтр по датам вычисляется в changelist_view()    
             return queryset
+            
+        def choices(self, changelist):
+            yield {
+                'selected': self.value() is None,
+                'query_string': changelist.get_query_string(remove=[self.parameter_name]),
+                'display': 'Текущий',
+            }
+            for lookup, title in self.lookup_choices:
+                yield {
+                    'selected': self.value() == str(lookup),
+                    'query_string': changelist.get_query_string({self.parameter_name: lookup}),
+                    'display': title,
+                }
     
     change_list_template = 'admin/booking_projects_change_list.html'
     
@@ -293,9 +319,6 @@ class MonthBookingEmployeeAdmin(BaseBookingAdmin):
     '''
     Отчет о месячной загрузке сотрудника в проектах
     '''
-    # Столбцов в отчете
-    COLUMNS = 18
-
     change_list_template = 'admin/booking_employee_change_list.html'
 
     list_filter = (
@@ -328,9 +351,9 @@ class MonthBookingEmployeeAdmin(BaseBookingAdmin):
         if year:
             month_from = date(int(year), 1, 1)
         else:
-            month_from = today().replace(day=1) - monthdelta(MonthBookingAdmin.COLUMNS - 12)
+            month_from = today().replace(day=1) - monthdelta(BaseBookingAdmin.COLUMNS - 12)
 
-        month_list = [month_from + monthdelta(i) for i in range(MonthBookingAdmin.COLUMNS)]
+        month_list = [month_from + monthdelta(i) for i in range(BaseBookingAdmin.COLUMNS)]
 
         response.context_data['months'] = month_list
         response.context_data['member'] = Employee.objects.filter(id=employee_id).first()
