@@ -529,6 +529,10 @@ def update_month_booking(sender, instance, **kwargs):
     '''
     Обновление данных о месячной загрузке в связанной таблице MonthBooking
     '''
+    # disable the handler during fixture loading
+    if kwargs['raw']:
+        return
+        
     # удаление старых данных
     MonthBooking.objects.filter(booking=instance).delete()
 
