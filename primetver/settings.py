@@ -120,6 +120,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = env.str('STATIC_ROOT', '/var/www/django-primetver/static/')
+
 
 # Email settings
 email = env.dj_email_url("EMAIL_URL", default="smtp://")

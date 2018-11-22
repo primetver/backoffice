@@ -483,11 +483,12 @@ class MonthBooking(md.Model):
     ''' 
     Базовая модель для хранения данных о плановой загрузке сотрудников по месяцам
 
-    Данная модель заполняется автоматически
+    Данная модель заполняется автоматически, см. update_month_booking
     '''
     class Meta():
         verbose_name = 'плановая загрузка за месяц'
         verbose_name_plural = 'данные плановой загрузки по месяцам'
+        unique_together = (('booking', 'month'),)
     
     booking = md.ForeignKey(Booking, on_delete=md.CASCADE, verbose_name='Запись по загрузке')
     month = md.DateField('Месяц', db_index=True) # число месяца всегда должно быть == 1
