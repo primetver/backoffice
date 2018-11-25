@@ -32,7 +32,7 @@ class Division(md.Model):
     name = md.CharField('Подразделение', max_length=40, unique=True)
     full_name = md.TextField('Полное название')
     head = md.OneToOneField('Employee', null=True, blank=True, on_delete=md.SET_NULL,
-        verbose_name='Руководитель', related_name='subordinate')
+        verbose_name='Руководитель', related_name='headed')
     
     # pylint: disable=no-member
     def occupied(self):
@@ -102,6 +102,14 @@ class Employee(md.Model):
         verbose_name_plural = 'сотрудники'
         ordering = ('last_name', 'first_name')
 
+    class Manager(md.Manager):
+        # поиск сотрудника по объекту пользователя
+        def by_user(self, user):
+            return self.filter(user__exact=user).first()
+
+    # замена менеджера по умолчанию
+    objects = Manager()
+
     last_name = md.CharField('Фамилия', max_length=200, db_index=True)
     first_name = md.CharField('Имя', max_length=200)
     sur_name = md.CharField('Отчество', max_length=200, blank=True)
@@ -124,7 +132,6 @@ class Employee(md.Model):
     full_name.admin_order_field = 'last_name'
     full_name.short_description = 'ФИО'
 
-    # pylint: disable=no-member
     def salary(self):
         try:
             s = self.salary_set.latest().amount 
@@ -133,11 +140,17 @@ class Employee(md.Model):
         return s
     salary.short_description = 'Текущий оклад'
 
-    def if_fired(self):
-        return self.fire_date < today()
+    def headed_division(self):
+        return Division.objects.filter(head_exact=self).first()
+    headed_division.short_description = 'Возглавляемое подразделение'
 
-    def info(self):
-        return f'{self.full_name()} ({self.id}), дата приема: {self.hire_date}, оклад: {self.salary()}'
+    def subordinates(self):
+        hd_div = self.headed_division()
+        return Employee.objects.filter(division__exact=hd_div) if hd_div else None
+    subordinates.short_description = 'Подчиненные'
+
+    def is_fired(self):
+        return self.fire_date < today()
 
     def __str__(self):
         return self.full_name()
