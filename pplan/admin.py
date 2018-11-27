@@ -5,7 +5,7 @@ from monthdelta import monthdelta, monthmod
 
 from .datautils import today, months
 from .models import (Booking, Business, Division, Employee, 
-                     MonthBookingSummary, MonthBookingEmployee, MonthBookingSelf,
+                     MonthBookingSummary, MonthBookingEmployee,
                      Passport, Position, Project, ProjectBooking,
                      ProjectMember, Role, Salary, StaffingTable)
 
@@ -320,13 +320,12 @@ class MonthBookingEmployeeAdmin(BaseBookingAdmin):
         # Parameter for the filter that will be used in the URL query.
         parameter_name = 'employee'
 
-        # перечень подчиненных для выбора
+        # формирование перечня сотрудников в зависимости от прав
         def lookups(self, request, model_admin):
-            # формирование перечня сотрудников в зависимости от прав
             if not request.user.has_perm('pplan.view_all'):
                 current_employee = Employee.objects.by_user(request.user)
                 # только подчиненные
-                objects = current_employee.subordinates() if current_employee else None
+                objects = current_employee.subordinates() if current_employee else ()
             else:
                 # все 
                 objects = Employee.objects.all()
@@ -354,7 +353,7 @@ class MonthBookingEmployeeAdmin(BaseBookingAdmin):
         current_employee = Employee.objects.by_user(request.user)
         current_id = current_employee.id if current_employee else None
         sub_list = [ employee.id for employee in current_employee.subordinates() ] if current_employee else []
-        print(sub_list)
+        sub_list.append(current_id)
 
         try:
             # извлечение данных запроса
@@ -383,13 +382,4 @@ class MonthBookingEmployeeAdmin(BaseBookingAdmin):
         
         return response
 
-@admin.register(MonthBookingSelf)
-class MonthBookingSelfAdmin(MonthBookingEmployeeAdmin):
-    '''
-    Отчет о собственной загрузке в проектах
-    '''
-
-    list_filter = (
-        BaseBookingAdmin.YearFilter,
-    )
        
