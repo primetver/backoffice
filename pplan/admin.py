@@ -322,23 +322,20 @@ class MonthBookingEmployeeAdmin(BaseBookingAdmin):
 
         # перечень подчиненных для выбора
         def lookups(self, request, model_admin):
-            current_employee = Employee.objects.by_user(request.user)
-
-            if current_employee is Employee:
-                return ( (employee.id, employee) for employee in current_employee.subordinates() )
-
+            # формирование перечня сотрудников в зависимости от прав
+            if not request.user.has_perm('pplan.view_all'):
+                current_employee = Employee.objects.by_user(request.user)
+                # только подчиненные
+                objects = current_employee.subordinates() if current_employee else None
+            else:
+                # все 
+                objects = Employee.objects.all()
+            
+            return ( (employee.id, employee) for employee in objects )
+            
         def queryset(self, request, queryset):
-            """
-            Returns the filtered queryset based on the value
-            provided in the query string and retrievable via
-            `self.value()`.
-            """
-            current_employee = Employee.objects.by_user(request.user)
-            sub_list = [ employee.id for employee in current_employee.subordinates() ] if current_employee else []
-            choice = self.value()
-
-            if choice in sub_list:
-                return queryset.filter(booking__project_member__employee__id=choice)
+            # no filter
+            return queryset
               
 
     list_filter = (
@@ -347,7 +344,6 @@ class MonthBookingEmployeeAdmin(BaseBookingAdmin):
     )
     
     # Отображение списка проектов и месячной загруженности по выбранному сотруднику
-    # если сотрудник не выбран - ничего не отображается 
     def changelist_view(self, request, extra_context=None):
         response = super().changelist_view(
             request,
@@ -356,24 +352,30 @@ class MonthBookingEmployeeAdmin(BaseBookingAdmin):
 
         # pylint: disable=no-member
         current_employee = Employee.objects.by_user(request.user)
+        current_id = current_employee.id if current_employee else None
+        sub_list = [ employee.id for employee in current_employee.subordinates() ] if current_employee else []
+        print(sub_list)
 
         try:
+            # извлечение данных запроса
             cl = response.context_data['cl']
             qs = cl.queryset
             year = cl.get_filters_params().get("year", None)
-            employee_id = cl.get_filters_params().get(
-                'employee',
-                current_employee.id if current_employee else None
-                )
-        except (AttributeError, KeyError):
+            employee_id = int(cl.get_filters_params().get('employee', current_id))
+
+            # проверка прав на просмотр указанного в запросе сотрудникa
+            if not request.user.has_perm('pplan.view_all') and not employee_id in sub_list:
+                return response
+            
+            # проверка месяца
+            if year:
+                month_from = date(int(year), 1, 1)
+            else:
+                month_from = today().replace(day=1) - monthdelta(BaseBookingAdmin.COLUMNS - 12)
+
+            month_list = [month_from + monthdelta(i) for i in range(BaseBookingAdmin.COLUMNS)]
+        except (AttributeError, KeyError, ValueError):
             return response
-
-        if year:
-            month_from = date(int(year), 1, 1)
-        else:
-            month_from = today().replace(day=1) - monthdelta(BaseBookingAdmin.COLUMNS - 12)
-
-        month_list = [month_from + monthdelta(i) for i in range(BaseBookingAdmin.COLUMNS)]
 
         response.context_data['months'] = month_list
         response.context_data['member'] = Employee.objects.filter(id=employee_id).first()

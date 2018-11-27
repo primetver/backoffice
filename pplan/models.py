@@ -141,12 +141,13 @@ class Employee(md.Model):
     salary.short_description = 'Текущий оклад'
 
     def headed_division(self):
-        return Division.objects.filter(head_exact=self).first()
+        return Division.objects.filter(head__exact=self).first()
     headed_division.short_description = 'Возглавляемое подразделение'
 
     def subordinates(self):
         hd_div = self.headed_division()
-        return Employee.objects.filter(division__exact=hd_div) if hd_div else None
+        # кроме уволенных
+        return Employee.objects.filter(division__exact=hd_div).exclude(fire_date__lt=today()) if hd_div else None
     subordinates.short_description = 'Подчиненные'
 
     def is_fired(self):
@@ -717,6 +718,9 @@ class MonthBookingEmployee(MonthBooking):
         proxy = True
         verbose_name = 'загрузка по сотруднику'
         verbose_name_plural = 'отчет о загрузке по сотруднику'
+        permissions = (
+            ("view_all", "Просмотр любого сотрудника"),
+        )
 
     class Manager(md.Manager):
         def get_queryset(self):
