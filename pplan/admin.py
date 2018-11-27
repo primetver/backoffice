@@ -5,7 +5,7 @@ from monthdelta import monthdelta, monthmod
 
 from .datautils import today, months
 from .models import (Booking, Business, Division, Employee, 
-                     MonthBookingSummary, MonthBookingEmployee, MonthBookingSelf,
+                     MonthBookingSummary, MonthBookingEmployee,
                      Passport, Position, Project, ProjectBooking,
                      ProjectMember, Role, Salary, StaffingTable)
 
@@ -145,8 +145,23 @@ class BaseBookingAdmin(admin.ModelAdmin):
     # Столбцов в отчете
     COLUMNS = 18
 
+    class ReportListFilter(admin.SimpleListFilter):
+        # Замена функции выбора, так чтобы значение по умолнянию вместо "Все" было "Текущий"
+        def choices(self, changelist):
+            yield {
+                'selected': self.value() is None,
+                'query_string': changelist.get_query_string(remove=[self.parameter_name]),
+                'display': 'Текущий',
+            }
+            for lookup, title in self.lookup_choices:
+                yield {
+                    'selected': self.value() == str(lookup),
+                    'query_string': changelist.get_query_string({self.parameter_name: lookup}),
+                    'display': title,
+                }
+
     # Фильтр отображения по годам
-    class YearFilter(admin.SimpleListFilter):
+    class YearFilter(ReportListFilter):
         # Human-readable title which will be displayed in the
         # right admin sidebar just above the filter options.
         title = 'Данные за год'
@@ -165,20 +180,7 @@ class BaseBookingAdmin(admin.ModelAdmin):
         def queryset(self, request, queryset):
             # не фильтруем, фильтр по датам вычисляется в changelist_view()    
             return queryset
-        
-        def choices(self, changelist):
-            yield {
-                'selected': self.value() is None,
-                'query_string': changelist.get_query_string(remove=[self.parameter_name]),
-                'display': 'Текущий',
-            }
-            for lookup, title in self.lookup_choices:
-                yield {
-                    'selected': self.value() == str(lookup),
-                    'query_string': changelist.get_query_string({self.parameter_name: lookup}),
-                    'display': title,
-                }
-
+    
     list_display_links = None
     list_filter = (YearFilter,)
     
@@ -234,13 +236,14 @@ class MonthBookingAdmin(BaseBookingAdmin):
 
         return response
 
+
 @admin.register(ProjectBooking)
 class ProjectBookingAdmin(BaseBookingAdmin):
     '''
     Отчет о загрузке сотрудников в проектах
     '''
-    # Фильтр отображения по годам
-    class MonthFilter(admin.SimpleListFilter):
+    # Фильтр отображения по месяцам
+    class MonthFilter(BaseBookingAdmin.ReportListFilter):
         title = 'Месяц'
         parameter_name = 'month'
 
@@ -250,20 +253,7 @@ class ProjectBookingAdmin(BaseBookingAdmin):
         def queryset(self, request, queryset):
             # не фильтруем, фильтр по датам вычисляется в changelist_view()    
             return queryset
-            
-        def choices(self, changelist):
-            yield {
-                'selected': self.value() is None,
-                'query_string': changelist.get_query_string(remove=[self.parameter_name]),
-                'display': 'Текущий',
-            }
-            for lookup, title in self.lookup_choices:
-                yield {
-                    'selected': self.value() == str(lookup),
-                    'query_string': changelist.get_query_string({self.parameter_name: lookup}),
-                    'display': title,
-                }
-    
+        
     change_list_template = 'admin/booking_projects_change_list.html'
     
     list_filter = (
@@ -321,13 +311,38 @@ class MonthBookingEmployeeAdmin(BaseBookingAdmin):
     '''
     change_list_template = 'admin/booking_employee_change_list.html'
 
+    # Фильтр отображения по сотрудникам
+    class EmployeeFilter(BaseBookingAdmin.ReportListFilter):
+        # Human-readable title which will be displayed in the
+        # right admin sidebar just above the filter options.
+        title = 'Сотрудники'
+
+        # Parameter for the filter that will be used in the URL query.
+        parameter_name = 'employee'
+
+        # формирование перечня сотрудников в зависимости от прав
+        def lookups(self, request, model_admin):
+            if not request.user.has_perm('pplan.view_all'):
+                current_employee = Employee.objects.by_user(request.user)
+                # только подчиненные
+                objects = current_employee.subordinates() if current_employee else ()
+            else:
+                # все 
+                objects = Employee.objects.all()
+            
+            return ( (employee.id, employee) for employee in objects )
+            
+        def queryset(self, request, queryset):
+            # no filter
+            return queryset
+              
+
     list_filter = (
         BaseBookingAdmin.YearFilter,
-        'booking__project_member__employee'
+        EmployeeFilter
     )
     
     # Отображение списка проектов и месячной загруженности по выбранному сотруднику
-    # если сотрудник не выбран - ничего не отображается 
     def changelist_view(self, request, extra_context=None):
         response = super().changelist_view(
             request,
@@ -335,25 +350,31 @@ class MonthBookingEmployeeAdmin(BaseBookingAdmin):
         )
 
         # pylint: disable=no-member
-        current_employee = Employee.objects.filter(user=request.user).first()
+        current_employee = Employee.objects.by_user(request.user)
+        current_id = current_employee.id if current_employee else None
+        sub_list = [ employee.id for employee in current_employee.subordinates() ] if current_employee else []
+        sub_list.append(current_id)
 
         try:
+            # извлечение данных запроса
             cl = response.context_data['cl']
             qs = cl.queryset
             year = cl.get_filters_params().get("year", None)
-            employee_id = cl.get_filters_params().get(
-                'booking__project_member__employee__id__exact',
-                current_employee.id if current_employee else None
-                )
-        except (AttributeError, KeyError):
+            employee_id = int(cl.get_filters_params().get('employee', current_id))
+
+            # проверка прав на просмотр указанного в запросе сотрудникa
+            if not request.user.has_perm('pplan.view_all') and not employee_id in sub_list:
+                return response
+            
+            # проверка месяца
+            if year:
+                month_from = date(int(year), 1, 1)
+            else:
+                month_from = today().replace(day=1) - monthdelta(BaseBookingAdmin.COLUMNS - 12)
+
+            month_list = [month_from + monthdelta(i) for i in range(BaseBookingAdmin.COLUMNS)]
+        except (AttributeError, KeyError, ValueError):
             return response
-
-        if year:
-            month_from = date(int(year), 1, 1)
-        else:
-            month_from = today().replace(day=1) - monthdelta(BaseBookingAdmin.COLUMNS - 12)
-
-        month_list = [month_from + monthdelta(i) for i in range(BaseBookingAdmin.COLUMNS)]
 
         response.context_data['months'] = month_list
         response.context_data['member'] = Employee.objects.filter(id=employee_id).first()
@@ -361,13 +382,4 @@ class MonthBookingEmployeeAdmin(BaseBookingAdmin):
         
         return response
 
-@admin.register(MonthBookingSelf)
-class MonthBookingSelfAdmin(MonthBookingEmployeeAdmin):
-    '''
-    Отчет о собственной загрузке в проектах
-    '''
-
-    list_filter = (
-        BaseBookingAdmin.YearFilter,
-    )
        
