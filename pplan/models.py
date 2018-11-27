@@ -32,7 +32,7 @@ class Division(md.Model):
     name = md.CharField('Подразделение', max_length=40, unique=True)
     full_name = md.TextField('Полное название')
     head = md.OneToOneField('Employee', null=True, blank=True, on_delete=md.SET_NULL,
-        verbose_name='Руководитель', related_name='subordinate')
+        verbose_name='Руководитель', related_name='headed')
     
     # pylint: disable=no-member
     def occupied(self):
@@ -81,8 +81,10 @@ class StaffingTable(md.Model):
 
     # pylint: disable=no-member
     def occupied(self):
-        return Employee.objects.filter(division__name=self.division,
-            position__name=self.position).exclude(fire_date__lt=today()).count()
+        return Employee.working.filter(
+            division__name=self.division,
+            position__name=self.position
+            ).count()
     occupied.short_description = 'Работает сотрудников'
 
     def vacant(self):
@@ -101,6 +103,19 @@ class Employee(md.Model):
         verbose_name = 'сотрудник'
         verbose_name_plural = 'сотрудники'
         ordering = ('last_name', 'first_name')
+
+    class Manager(md.Manager):
+        # поиск сотрудника по объекту пользователя
+        def by_user(self, user):
+            return self.filter(user__exact=user).first()
+    
+    class WorkingManager(Manager):
+        def get_queryset(self):
+            return super().get_queryset().exclude(fire_date__lt=today())
+
+    # замена менеджера по умолчанию
+    objects = Manager()
+    working = WorkingManager()
 
     last_name = md.CharField('Фамилия', max_length=200, db_index=True)
     first_name = md.CharField('Имя', max_length=200)
@@ -124,7 +139,6 @@ class Employee(md.Model):
     full_name.admin_order_field = 'last_name'
     full_name.short_description = 'ФИО'
 
-    # pylint: disable=no-member
     def salary(self):
         try:
             s = self.salary_set.latest().amount 
@@ -133,11 +147,18 @@ class Employee(md.Model):
         return s
     salary.short_description = 'Текущий оклад'
 
-    def if_fired(self):
-        return self.fire_date < today()
+    def headed_division(self):
+        return Division.objects.filter(head__exact=self).first()
+    headed_division.short_description = 'Возглавляемое подразделение'
 
-    def info(self):
-        return f'{self.full_name()} ({self.id}), дата приема: {self.hire_date}, оклад: {self.salary()}'
+    def subordinates(self):
+        hd_div = self.headed_division()
+        # кроме уволенных
+        return Employee.working.filter(division__exact=hd_div) if hd_div else ()
+    subordinates.short_description = 'Подчиненные'
+
+    def is_fired(self):
+        return self.fire_date < today()
 
     def __str__(self):
         return self.full_name()
@@ -228,8 +249,7 @@ class Passport(md.Model):
     )
     
     employee = md.ForeignKey(Employee, on_delete=md.CASCADE, verbose_name='Сотрудник')
-    doctype = md.CharField('Тип документа', max_length=2, 
-        default=RF, choices=DOCTYPE_CHOICES)
+    doctype = md.CharField('Тип документа', max_length=2, default=RF, choices=DOCTYPE_CHOICES)
     series = md.CharField('Серия', max_length=20)
     number = md.CharField('Номер', max_length=20)
     issue_date = md.DateField('Дата выдачи')
@@ -298,7 +318,6 @@ class Project(md.Model):
     budget_state = md.CharField('Состояние бюджета', max_length=2, 
                                 default=BUDGET_NONE, choices=BUDGET_STATE_CHOICES)
 
-    # pylint: disable=no-member
     def lead(self):
         try:
             s = self.projectmember_set.get(role__is_lead=True).employee.full_name() 
@@ -370,7 +389,6 @@ class ProjectMember(md.Model):
     employee = md.ForeignKey(Employee, on_delete=md.CASCADE, verbose_name='Сотрудник')
     role = md.ForeignKey(Role, on_delete=md.PROTECT, verbose_name='Роль в проекте')
     
-    # pylint: disable=no-member
     def start_date(self):
         return self._start_date_for_state(Booking.PLAN)
     start_date.short_description = 'Дата начала'
@@ -704,6 +722,9 @@ class MonthBookingEmployee(MonthBooking):
         proxy = True
         verbose_name = 'загрузка по сотруднику'
         verbose_name_plural = 'отчет о загрузке по сотруднику'
+        permissions = (
+            ("view_all", "Просмотр любого сотрудника"),
+        )
 
     class Manager(md.Manager):
         def get_queryset(self):
@@ -758,13 +779,3 @@ class MonthBookingEmployee(MonthBooking):
                     'booking': month_booking.groupby('month').sum().reindex(month_list, fill_value=0).to_dict('records')
                 }
             )
-
-
-class MonthBookingSelf(MonthBookingEmployee):
-    ''' 
-    Прокси-модель для отчета о собственной загрузке сотрудника
-    '''
-    class Meta():
-        proxy = True
-        verbose_name = 'собственная загрузка'
-        verbose_name_plural = 'отчет о собственной загрузке'
