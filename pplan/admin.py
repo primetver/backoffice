@@ -352,15 +352,21 @@ class MonthBookingEmployeeAdmin(BaseBookingAdmin):
         # pylint: disable=no-member
         current_employee = Employee.objects.by_user(request.user)
         current_id = current_employee.id if current_employee else None
+        # список разрешенных для просмотра
         sub_list = [ employee.id for employee in current_employee.subordinates() ] if current_employee else []
-        sub_list.append(current_id)
+        # по себе смотреть можно всегда, если сотрудник - добавляем в список
+        if current_id:
+            sub_list.append(current_id)
 
         try:
             # извлечение данных запроса
             cl = response.context_data['cl']
             qs = cl.queryset
             year = cl.get_filters_params().get("year", None)
-            employee_id = int(cl.get_filters_params().get('employee', current_id))
+            # сотрудник из запроса
+            employee_id = cl.get_filters_params().get('employee', current_id)
+            employee_id = int(employee_id) if employee_id else None
+            
 
             # проверка прав на просмотр указанного в запросе сотрудникa
             if not request.user.has_perm('pplan.view_all') and not employee_id in sub_list:
