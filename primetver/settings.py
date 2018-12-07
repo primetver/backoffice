@@ -37,7 +37,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'phonenumber_field',
-    'pplan.apps.PplanConfig'
+    'pplan.apps.PplanConfig',
+    'jiradata'
 ]
 
 MIDDLEWARE = [
@@ -78,6 +79,11 @@ DATABASES = {
     "default": env.dj_db_url(
         "DATABASE_URL",
         default="sqlite:///" + os.path.join(BASE_DIR, "db.sqlite3"),
+        ssl_require=not DEBUG,
+    ),
+    "jira": env.dj_db_url(
+        "JIRA_URL",
+        default="sqlite:///" + os.path.join(BASE_DIR, "jira.sqlite3"),
         ssl_require=not DEBUG,
     )
 }

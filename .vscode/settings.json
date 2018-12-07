@@ -4,6 +4,8 @@
         "descr",
         "endblock",
         "groupby",
+        "jira",
+        "jiradata",
         "kargs",
         "pplan",
         "primetver",
