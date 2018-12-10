@@ -1,18 +1,41 @@
 from django.contrib import admin
 
-from .models import (Worklog)
+from .models import (JiraIssue, Worklog, Customfield)
 
 # Register your models here.
 
-@admin.register(Worklog)
-class WorklogAdmin(admin.ModelAdmin):
+class JiraAdmin(admin.ModelAdmin):
     '''
-    Журнал работ
+    Доступ только для чтения
     '''
     def has_add_permission(self, request, extra_context=None): return False
     def has_change_permission(self, request, extra_context=None): return False
     def has_delete_permission(self, request, extra_context=None): return False
 
-    list_display = ('issueid', 'updated', 'updateauthor', 'worklogbody', 'startdate', 'timeworked')
+
+@admin.register(JiraIssue)
+class JiraIssueAdmin(JiraAdmin):
+    '''
+    Запросы Jira
+    '''
+    list_display = ('issuenum', 'summary', 'description', 'creator', 'assignee', 'created', 'updated', 'hours')
+    list_filter = ('creator', 'assignee')
+    date_hierarchy = 'updated'
+
+
+@admin.register(Worklog)
+class WorklogAdmin(JiraAdmin):
+    '''
+    Журнал работ
+    '''
+    list_display = ('budget', 'updated', 'updateauthor', 'worklogbody', 'startdate', 'hours')
     list_filter = ('updateauthor',)
     date_hierarchy = 'startdate'
+
+
+@admin.register(Customfield)
+class CustomfieldAdmin(JiraAdmin):
+    '''
+    Определения пользовательских полей
+    '''
+    list_display = ('cfname', 'description')
