@@ -18,7 +18,7 @@ class JiraIssueAdmin(JiraAdmin):
     '''
     Запросы Jira
     '''
-    list_display = ('issuenum', 'summary', 'description', 'creator', 'assignee', 'created', 'updated', 'hours')
+    list_display = ('issuenum', 'budget_name', 'summary', 'creator', 'assignee', 'created', 'updated', 'hours')
     list_filter = ('creator', 'assignee')
     date_hierarchy = 'updated'
 
@@ -28,7 +28,7 @@ class WorklogAdmin(JiraAdmin):
     '''
     Журнал работ
     '''
-    list_display = ('budget', 'updated', 'updateauthor', 'worklogbody', 'startdate', 'hours')
+    list_display = ('id', 'budget_name', 'updated', 'updateauthor', 'worklogbody', 'startdate', 'hours')
     list_filter = ('updateauthor',)
     date_hierarchy = 'startdate'
 

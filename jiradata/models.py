@@ -1,7 +1,5 @@
 from django.db import models as md
 
-budget_customfield = 10700
-
 
 class JiraModel(md.Model):
     '''
@@ -20,7 +18,34 @@ class JiraModel(md.Model):
     objects = JiraManager()
 
 
-class JiraIssue(JiraModel):
+class BudgetCustomField:
+    '''
+    Mixin класс методов получения номера и строки бюджета из кастомного поля
+    '''
+    # id кастомного поля бюджета в Jira
+    # TODO: параметр настройки
+    budget_customfield = '10700'
+
+    def get_issueid(self):
+        # должно быть переопределено
+        return None
+
+    def customfield_value(self, customfield):
+        cfv = CustomfieldValue.objects.filter(issue=self.get_issueid(), customfield=customfield).get()
+        return cfv.value()
+
+    def budget_id(self):
+        return self.customfield_value(BudgetCustomField.budget_customfield)
+    budget_id.short_description = 'ID бюджета'
+
+    def budget_name(self):
+        id = self.budget_id()
+        return CustomfieldOption.objects.filter(id=id).get().customvalue
+    budget_name.short_description = 'Бюджет проекта'
+
+
+
+class JiraIssue(JiraModel, BudgetCustomField):
     '''
     Запрос JIRA
     '''
@@ -49,12 +74,15 @@ class JiraIssue(JiraModel):
     def hours(self):
         return (self.timespent or 0) / 3600
     hours.short_description = 'Затраченное время, ч'
+
+    def get_issueid(self):
+        return self.id
                     
     def __str__(self):
         return f'{self.issuenum}'
 
 
-class Worklog(JiraModel):
+class Worklog(JiraModel, BudgetCustomField):
     '''
     Журнал учета работ
     '''
@@ -80,14 +108,10 @@ class Worklog(JiraModel):
 
     def issue(self):
         issue = JiraIssue.objects.filter(id=self.issueid).get()
-        return issue.issuenum
+        return issue.summary
 
-    def customfield_value(self, customfield):
-        value = CustomfieldValue.objects.filter(issue=self.issueid, customfield=customfield).get()
-        return value.value()
-
-    def budget(self):
-        return self.customfield_value(budget_customfield)
+    def get_issueid(self):
+        return self.issueid       
         
     def __str__(self):
         return f'{self.startdate:%d.%m.%Y} {self.author} {self.worklogbody or ""} {self.hours()} ч.'
@@ -136,8 +160,29 @@ class CustomfieldValue(JiraModel):
     valuetype = md.CharField('Тип значения', max_length=255)
 
     def value(self):
-        self.numbervalue or self.stringvalue or self.datevalue or self.textvalue
+        return self.numbervalue or self.stringvalue or self.datevalue or self.textvalue
             
     def __str__(self):
         return str(self.value())
+
+
+class CustomfieldOption(JiraModel):
+    '''
+    Опции пользовательских полей
+    '''
+    class Meta(JiraModel.Meta):
+        db_table = 'customfieldoption'
+        verbose_name = 'опция пользовательского поля'
+        verbose_name_plural = 'опции пользовательских полей'
+        
+    id = md.DecimalField('ID', primary_key=True, max_digits=18, decimal_places=0)
+    customfield = md.DecimalField('Пользовательское поле', max_digits=18, decimal_places=0)
+    sequence = md.DecimalField('Последовательный номер', max_digits=18, decimal_places=0)
+    customvalue = md.CharField('Значение', max_length=255)
+    optiontype = md.CharField('Тип значения', max_length=60)
+    disabled = md.CharField('Не активно', max_length=60)
+            
+    def __str__(self):
+        return self.customvalue
+
     
