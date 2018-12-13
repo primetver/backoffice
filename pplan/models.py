@@ -1,14 +1,15 @@
 # pylint: disable=no-member
+import itertools as it
+import logging
 from datetime import timedelta
 
-from django_pandas.io import read_frame
-
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models as md
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.contrib.auth.models import User
 from django_pandas.io import read_frame
 from monthdelta import monthdelta, monthmod
 from phonenumber_field.modelfields import PhoneNumberField
@@ -16,7 +17,8 @@ from phonenumber_field.modelfields import PhoneNumberField
 from .datautils import today, tomorrow, volume, workdays
 from .proxy_perm_create import proxy_perm_create
 
-import itertools as it
+# Get an instance of a logger
+logger = logging.getLogger(__name__)
 
 # Create your models here.
 
@@ -581,7 +583,55 @@ def update_month_booking(sender, instance, **kwargs):
             volume=vol)
         month_booking.save()
 
+@receiver(post_save, sender=Booking)
+def send_booking_mail(sender, instance, **kwargs):
+    '''
+    Отсылка письма при изменении данных о загрузке
+    '''
+    # disable the handler during fixture loading
+    if kwargs['raw']:
+        return
 
+    member = instance.project_member
+    employee = member.employee
+    project  = member.project
+    app = sender._meta.label
+
+    try:
+        send_mail(
+            subject=f'[{app.upper()}] Обновление данных об участии в проекте {project}',
+            message=f'''Уважаемый {employee}!
+
+            Данные о вашем участии в проекте {project} были обновлены. Рекомендуем вам ознакомится \
+            с обновленной информацией о вашем планируемом участии и уточнить изменения у руководителя проекта:
+            
+            Измененные данные по вашему участию: {instance}
+
+            Общая информация о проекте:
+
+            Бизнес: {project.business}
+            Руководитель бизнеса: {project.business.lead}
+
+            Проект: {project.short_name}
+            Полное название: {project.full_name}
+            Руководитель проекта: {project.lead()}
+
+            Ваша роль в проекте: {member.role}.
+            {member.role.descr}
+
+            Дата начала участия: {member.start_date()}
+            Дата окончания участия: {member.finish_date()}
+            Число месяцев участия: {member.month_count()}
+            Общий планируемый объем участия: {member.volume()} чел.дней
+            Среднемесячная загрузка: {member.load()}    
+            ''',
+            from_email=f'{app}@localhost',
+            recipient_list=[f'{employee.user.email}']
+        )
+    except Exception as e:
+        print(e)
+
+        
 class MonthBookingSummary(MonthBooking):
     ''' 
     Прокси-модель для сводного отчета о загрузке сотрудников по месяцам

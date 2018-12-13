@@ -124,7 +124,7 @@ STATIC_ROOT = env.str('STATIC_ROOT', '/var/www/django-primetver/static/')
 
 
 # Email settings
-email = env.dj_email_url("EMAIL_URL", default="smtp://")
+email = env.dj_email_url("EMAIL_URL", default="smtp://localhost:1025")
 EMAIL_HOST = email["EMAIL_HOST"]
 EMAIL_PORT = email["EMAIL_PORT"]
 EMAIL_HOST_PASSWORD = email["EMAIL_HOST_PASSWORD"]
