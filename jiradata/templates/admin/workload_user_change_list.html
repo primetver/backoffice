@@ -1,0 +1,55 @@
+{% extends 'admin/change_list.html' %}
+
+{% block content_title %}
+    <h1>Фактическая загрузка по проектам, час.</h1>
+    <p>Участник проекта: {{ member | default:"не выбран" }}</p>
+{% endblock %}
+
+{% block result_list %}
+
+<div class="results">
+  <table>
+    <thead>
+      <tr>
+        <th>
+          <div class="text">
+            <a href="#">Проект</a>
+          </div>
+        </th>
+        {% for m in months %}
+        <th>
+          <div class="text" align="right">
+            <a href="#">{{ m | date:"Y.m" }}</a>
+          </div>
+        </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+        {% for row in summary %}
+        <tr class="{% cycle 'row1' 'row2' as rowcolors %}">
+            <td> {{ row.project }} </td>
+            {% for b in row.workload %}
+            <td align="right">
+                {{ b.hours | default:'' | floatformat:2 }}
+            </td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+        {% if total %}
+        <tr class="{% cycle rowcolors %}">
+            <td><strong> ВСЕГО: </strong></td>
+            {% for b in total.workload %}
+            <td align="right">
+                <strong>{{ b.hours | default:'' | floatformat:2 }}</strong>
+            </td>
+            {% endfor %}
+        </tr>
+        {% endif %}
+      </tbody>
+  </table>
+</div>
+
+{% endblock %}
+
+{% block pagination %}{% endblock %}
