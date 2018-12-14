@@ -26,30 +26,37 @@ class JiraModel(md.Model):
 
 class BudgetCustomField:
     '''
-    Mixin класс методов получения номера и строки бюджета из кастомного поля
+    Класс методов получения номера и строки бюджета из кастомного поля бюджета проекта
     '''
     # id кастомного поля бюджета в Jira
-    # TODO: параметр настройки
-    budget_customfield = '10700'
+    # TODO: может быть параметром настройки
+    id = 10700
 
     def __init__(self, id=None):
         self._issueid = id
 
     def get_issueid(self):
-        # должно быть переопределено
+        # метод, возвращающий id запроса должнен быть переопределен в дочерних классах
         return self._issueid
 
-    def customfield_value(self, customfield):
-        cfv = CustomfieldValue.objects.filter(issue=self.get_issueid(), customfield=customfield).get()
-        return cfv.value()
+    def budget_id_name(self):
+        cfv = CustomfieldValue.objects.filter(
+            issue=self.get_issueid(), 
+            customfield=BudgetCustomField.id
+        ).first()
+
+        # id и имя бюджета проекта
+        return (
+            cfv.value() if cfv else None,
+            cfv.value_option() if cfv else None
+        )
 
     def budget_id(self):
-        return self.customfield_value(BudgetCustomField.budget_customfield)
+        return self.budget_id_name()[0]
     budget_id.short_description = 'ID бюджета'
-
+    
     def budget_name(self):
-        id = self.budget_id()
-        return CustomfieldOption.objects.filter(id=id).get().customvalue
+        return self.budget_id_name()[1]
     budget_name.short_description = 'Бюджет проекта'
 
 #
@@ -194,10 +201,17 @@ class CustomfieldValue(JiraModel):
     valuetype = md.CharField('Тип значения', max_length=255)
 
     def value(self):
+        # значение может быть в одном из полей, соответствующих типу значения
         return self.numbervalue or self.stringvalue or self.datevalue or self.textvalue
+
+    def option_value(self):
+        # возврат значения опции, если определена, иначе значения поля
+        value = self.value()
+        option = CustomfieldOption.objects.filter(id=value).first().customvalue
+        return option or value
             
     def __str__(self):
-        return str(self.value())
+        return str(self.option_value())
 
 
 class CustomfieldOption(JiraModel):
@@ -259,28 +273,25 @@ class WorklogReport(Worklog):
             df = read_frame(
                 qs,
                 fieldnames=[
+                    'issueid'
                     'startdate',
                     'timeworked',            
-                ],
-                index_col = 'issueid'
+                ]
             )
             if df.empty: return [], None
 
-            # извлекаем уникальный массив задач
-            issues = df.index.unique()
-            # создаем фрейм названий бюджетов для задач
-            bdf = pd.DataFrame(
-                ( BudgetCustomField(issueid).budget_name() for issueid in issues ),
-                index=issues,
-                columns=['budget'])
+            # создаем карту названий бюджетов для задач (свертка по бюджетам)
+            bmap = { issueid:BudgetCustomField(issueid).budget_name() for issueid in df['issueid'].unique() }
 
-            # объединение в один
-            wdf = pd.merge(df, bdf, left_index=True, right_index=True)
-            wdf['month'] = wdf['startdate'].map(lambda x: date(year=x.year, month=x.month, day=1))
-            wdf['hours'] =  wdf['timeworked'] / 3600
+            # рассчитываем требуемые для отчета колонки
+            df['budget'] = df['issueid'].map(lambda x: bmap[x])
+            df['month'] = df['startdate'].map(lambda x: date(year=x.year, month=x.month, day=1))
+            df['hours'] =  df['timeworked'] / 3600
+
+            del df['issueid']; del df['startdate']; del df['timeworked'] 
 
             # агрегирование по бюджетам и месяцам, получаем фрейм с иерархическим индексом: проект, месяц
-            month_worklog = wdf.groupby(['budget', 'month']).sum()
+            month_worklog = df.groupby(['budget', 'month']).sum()
 
             # результат -- кортеж:
             # 1) генератор последовательности словарей с полями: 
@@ -292,7 +303,7 @@ class WorklogReport(Worklog):
                 (
                     {
                         'project': p,
-                        # сбрасываем индекс по проектам, переиндексируем по списку месяцев, выводим в список словарей
+                        # сбрасываем индекс по бюджетам, переиндексируем по заданному списку месяцев, выводим в список словарей
                         'workload': worklog.reset_index(level=0, drop=True).reindex(month_list, fill_value=0).to_dict('records')
                     } for p, worklog in month_worklog.groupby(level='budget')
                 ),
