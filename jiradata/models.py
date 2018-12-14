@@ -262,8 +262,8 @@ class WorklogReport(Worklog):
         Дополненный класс запроса для вывода агрегированных затрат времени по пользователю
         '''
         # Формирование набора данных  
-        def get_workload(self, month_list, user):
-             # фильтрация запроса по времени и указанному пользователю
+        def get_workload(self, month_list, user, month_hours=None):
+             # фильтрация запроса по времени и пользователю
             qs = self.filter(
                 startdate__range=(month_list[0], month_list[-1]), 
                 author=user
@@ -287,6 +287,14 @@ class WorklogReport(Worklog):
             df['budget'] = df['issueid'].map(lambda x: bmap[x])
             df['month'] = df['startdate'].map(lambda x: date(year=x.year, month=x.month, day=1))
             df['hours'] =  df['timeworked'] / 3600
+
+            # рассчет процента загрузки, если передана карта нормы рабочих часов по месяцам
+            # -1% если норма для месяца отсутствует (признак ошибки)
+            if month_hours:
+                df['load'] = df.apply(
+                    (lambda x: x['hours'] / month_hours.get(x['month'], -x['hours']*100) * 100),
+                    asix=1
+                )
 
             del df['issueid']; del df['startdate']; del df['timeworked'] 
 

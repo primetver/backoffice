@@ -138,7 +138,7 @@ class WorklogReportAdmin(JiraAdmin):
             # извлечение данных запроса
             cl = response.context_data['cl']
             qs = cl.queryset
-            year = cl.get_filters_params().get("year", None)
+            year = cl.get_filters_params().get("year")
             # пользователь из параметров фильтра или текущий
             user = cl.get_filters_params().get('user', request.user.username)
         
@@ -150,8 +150,8 @@ class WorklogReportAdmin(JiraAdmin):
             if year:
                 month_from = date(int(year), 1, 1)
             else:
-                now = timezone.now()
-                month_from = date(now.year, now.month, 1) - monthdelta(COLUMNS-2)
+                date_from = timezone.now() - monthdelta(COLUMNS-1)
+                month_from = date(date_from.year, date_from.month, 1)
 
             month_list = [month_from + monthdelta(i) for i in range(COLUMNS)]
         except (AttributeError, KeyError, ValueError):
