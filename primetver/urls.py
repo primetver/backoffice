@@ -16,6 +16,13 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+admin.AdminSite.site_header = 'Тверской филиал'
+admin.AdminSite.site_url = None
+admin.AdminSite.index_title = 'Главная страница' 
+
+# Load proxy model permission creator
+from .proxy_perm_create import proxy_perm_create
+
 urlpatterns = [
     path('', admin.site.urls),
    # path('plan/', include('pplan.urls'))

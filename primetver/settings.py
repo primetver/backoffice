@@ -11,14 +11,15 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
+
 from environs import Env
+
 
 env = Env()
 env.read_env()  # read .env file, if it exists
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 
 # Override in .env for local development
 DEBUG = TEMPLATE_DEBUG = env.bool("DEBUG", default=False)
@@ -37,7 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'phonenumber_field',
-    'pplan.apps.PplanConfig'
+    'pplan.apps.PplanConfig',
+    'pstat.apps.PstatConfig'
 ]
 
 MIDDLEWARE = [
