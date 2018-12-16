@@ -1,18 +1,17 @@
 # pylint: disable=no-member
 from datetime import timedelta
 
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models as md
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.contrib.auth.models import User
 from monthdelta import monthdelta, monthmod
 from phonenumber_field.modelfields import PhoneNumberField
 
 from .datautils import today, tomorrow, volume, workdays
-
-import itertools as it
 
 # Create your models here.
 
@@ -66,7 +65,7 @@ class StaffingTable(md.Model):
     Штатное расписание
     '''
     class Meta():
-        verbose_name = 'позиция штатного расписанию'
+        verbose_name = 'позиция штатного расписания'
         verbose_name_plural = 'позиции штатного расписания'
         unique_together = (('position', 'division'),)
         ordering = ('division', 'position')
@@ -195,7 +194,6 @@ class Employee(md.Model):
                 raise ValidationError(f'Дата рождения {self.birthday:%d.%m.%Y} не может быть позднее \
                 даты приема на работу {self.hire_date:%d.%m.%Y}, нельзя родиться на работе ;)')
         except TypeError: pass
-
         
 
 class Salary(md.Model):
@@ -267,6 +265,7 @@ class Business(md.Model):
 
     def __str__(self):
         return self.name
+
 
 class Project(md.Model):
     '''
@@ -370,6 +369,7 @@ class Role(md.Model):
 
     def __str__(self):
         return self.role
+
 
 class ProjectMember(md.Model):
     '''
@@ -503,8 +503,7 @@ class MonthBooking(md.Model):
         verbose_name = 'загрузка за месяц'
         verbose_name_plural = 'загрузки по месяцам'
         unique_together = (('booking', 'month'),)
-        default_permissions = ('view',)
-        
+        default_permissions = ()  # предусмотрен доступ к данным только через proxy-модели
     
     booking = md.ForeignKey(Booking, on_delete=md.CASCADE, verbose_name='Запись по загрузке')
     month = md.DateField('Месяц', db_index=True) # число месяца всегда должно быть == 1
@@ -540,7 +539,9 @@ class MonthBooking(md.Model):
         raise ValidationError('Данные месячной загрузки рассчитываются автоматически и\
         не могут быть добавлены или отредактированы вручную. Вернитесь к просмотру данных.')
 
+
 @receiver(post_save, sender=Booking)
+@transaction.atomic
 def update_month_booking(sender, instance, **kwargs):
     '''
     Обновление данных о месячной загрузке в связанной таблице MonthBooking
@@ -571,12 +572,10 @@ def update_month_booking(sender, instance, **kwargs):
         load = days / workdays(month, monthtail) * instance.load    # нагрузка за месяц
 
         # заполнение таблицы помесячной загрузки
-        month_booking = MonthBooking(
+        MonthBooking(
             booking=instance,
             month=month,
             days=days,
             load=load,
-            volume=vol)
-        month_booking.save()
-
-
+            volume=vol
+        ).save()

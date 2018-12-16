@@ -1,17 +1,19 @@
 import sys
 
 from django.db import models as md
+from django.db import transaction
 from django.apps import apps
 from django.utils.encoding import smart_text
 from django.contrib.auth.management import _get_all_permissions
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 
+
 # proxy model missing permission workaround for Django 2.0
+@transaction.atomic
 def proxy_perm_create(**kwargs):
     for model in apps.get_models():
         opts = model._meta
-        #print(opts.verbose_name_raw)
         ctype, created = ContentType.objects.get_or_create(
             app_label=opts.app_label,
             model=opts.object_name.lower())
@@ -26,9 +28,9 @@ def proxy_perm_create(**kwargs):
                 content_type=ctype,
                 defaults={'name': name})
             if created:
-                sys.stdout.write('Adding permission {}\n'.format(p))
+                sys.stdout.write('Adding permission: {}\n'.format(p))
 
-            # delete stupid parent model permission for proxy model
+            # delete unused parent model permission for proxy model
             # NOTE: this must be done for every migration, see django ticket #11154
             if opts.proxy:
                 for parent in model.__bases__:
@@ -38,7 +40,7 @@ def proxy_perm_create(**kwargs):
                         content_type__app_label=popts.app_label,
                         content_type__model=popts.object_name.lower())
                     if pperm.exists():
-                        sys.stdout.write('Delete parent permission {}\n'.format(pperm.first()))
+                        sys.stdout.write('Delete parent permission: {}\n'.format(pperm.first()))
                         pperm.delete()
             
 

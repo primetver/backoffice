@@ -13,8 +13,8 @@ class MonthBookingSummary(MonthBooking):
     '''
     class Meta():
         proxy = True
-        verbose_name = 'загрузка по месяцам'
-        verbose_name_plural = 'отчет о загрузке по месяцам'
+        verbose_name = 'сводный отчет о загрузке по месяцам'
+        verbose_name_plural = verbose_name
         default_permissions = ('view',)
 
     class Manager(md.Manager):
@@ -74,8 +74,8 @@ class ProjectBooking(MonthBooking):
     '''
     class Meta():
         proxy = True
-        verbose_name = 'загрузка по проектам'
-        verbose_name_plural = 'отчет о загрузке по проектам'
+        verbose_name = 'отчет о загрузке по проектам'
+        verbose_name_plural = verbose_name
         default_permissions = ('view',)
 
     class Manager(md.Manager):
@@ -153,8 +153,8 @@ class MonthBookingEmployee(MonthBooking):
     '''
     class Meta():
         proxy = True
-        verbose_name = 'загрузка по сотруднику'
-        verbose_name_plural = 'отчет о загрузке по сотруднику'
+        verbose_name = 'отчет о загрузке по сотруднику'
+        verbose_name_plural = verbose_name
         default_permissions = ('view',)
         permissions = (
             ("view_all", "Просмотр любого сотрудника"),

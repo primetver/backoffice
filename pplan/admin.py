@@ -1,12 +1,26 @@
 from datetime import date
 
 from django.contrib import admin
+from django.contrib.auth.models import Permission
 from monthdelta import monthdelta, monthmod
 
 from .datautils import months, today
 from .models import (Booking, Business, Division, Employee, Passport, Position,
                      Project, ProjectMember, Role, Salary, StaffingTable)
 
+
+# Регистрация модели для управления правами
+@admin.register(Permission)
+class PermissionAdmin(admin.ModelAdmin):
+    '''
+    Редактирование списка прав
+    '''
+    list_display = ('content_type', 'codename', 'name', '__str__')
+    list_filter = ('content_type__app_label', 'content_type__model')
+
+#
+# Модели приложения pplan
+#
 
 @admin.register(Division)
 class DivisionAdmin(admin.ModelAdmin):
