@@ -81,9 +81,10 @@ class WorklogReportAdmin(JiraAdmin):
 
         # формирование перечня сотрудников в зависимости от прав
         def lookups(self, request, model_admin):
+            # перечень для выбора доступен только с правом jiradata.view_all
             if request.user.has_perm('jiradata.view_all'):
-                users = JiraUser.objects.filter(active=1)
-                return ( (user.user_name, str(user)) for user in users )
+                users = Worklog.objects.values_list('author', flat=True).distinct()
+                return ( (user, JiraUser.objects.filter(user_name=user).first() or user) for user in users )
             return ()
             
         def queryset(self, request, queryset):
@@ -130,10 +131,6 @@ class WorklogReportAdmin(JiraAdmin):
             request,
             extra_context=extra_context
         )
-
-        # pylint: disable=no-member
-        request.user.username
-        
         try:
             # извлечение данных запроса
             cl = response.context_data['cl']

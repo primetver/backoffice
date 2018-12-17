@@ -15,6 +15,7 @@ class JiraModel(md.Model):
     class Meta():
         managed = False
         abstract = True
+        default_permissions = ('view',)
 
     class JiraManager(md.Manager):
         def get_queryset(self):
@@ -48,7 +49,7 @@ class BudgetCustomField:
         # id и имя бюджета проекта
         return (
             cfv.value() if cfv else None,
-            cfv.value_option() if cfv else None
+            cfv.option_value() if cfv else None
         )
 
     def budget_id(self):
@@ -246,6 +247,7 @@ class WorklogReport(Worklog):
         proxy = True
         verbose_name = 'фактическая загрузка по сотруднику'
         verbose_name_plural = 'отчет о фактической загрузке по сотруднику'
+        default_permissions = ('view',)
         permissions = (
             ("view_all", "Просмотр любого сотрудника"),
         )
@@ -265,7 +267,7 @@ class WorklogReport(Worklog):
         def get_workload(self, month_list, user, month_hours=None):
              # фильтрация запроса по времени и пользователю
             qs = self.filter(
-                startdate__range=(month_list[0], month_list[-1]), 
+                startdate__range=(month_list[0], month_list[-1]+monthdelta(1)), 
                 author=user
             )
 
@@ -273,33 +275,39 @@ class WorklogReport(Worklog):
             df = read_frame(
                 qs,
                 fieldnames=[
-                    'issueid'
                     'startdate',
-                    'timeworked',            
-                ]
+                    'timeworked'            
+                ],
+                index_col = 'issueid'
             )
             if df.empty: return [], None
 
-            # создаем карту названий бюджетов для задач (свертка по бюджетам)
-            bmap = { issueid:BudgetCustomField(issueid).budget_name() for issueid in df['issueid'].unique() }
-
+            # извлекаем уникальный массив задач
+            issues = df.index.unique()
+            # создаем фрейм названий бюджетов для задач
+            bdf = pd.DataFrame(
+                ( BudgetCustomField(issueid).budget_name() for issueid in issues ),
+                index=issues,
+                columns=['budget'])
+            # объединение в один
+            wdf = pd.merge(df, bdf, left_index=True, right_index=True)
+            
             # рассчитываем требуемые для отчета колонки
-            df['budget'] = df['issueid'].map(lambda x: bmap[x])
-            df['month'] = df['startdate'].map(lambda x: date(year=x.year, month=x.month, day=1))
-            df['hours'] =  df['timeworked'] / 3600
-
+            wdf['month'] = wdf['startdate'].map(lambda x: date(year=x.year, month=x.month, day=1))
+            wdf['hours'] =  wdf['timeworked'] / 3600
+            
             # рассчет процента загрузки, если передана карта нормы рабочих часов по месяцам
             # -1% если норма для месяца отсутствует (признак ошибки)
             if month_hours:
-                df['load'] = df.apply(
+                wdf['load'] = wdf.apply(
                     (lambda x: x['hours'] / month_hours.get(x['month'], -x['hours']*100) * 100),
                     asix=1
                 )
 
-            del df['issueid']; del df['startdate']; del df['timeworked'] 
+            del wdf['startdate']; del wdf['timeworked']
 
             # агрегирование по бюджетам и месяцам, получаем фрейм с иерархическим индексом: проект, месяц
-            month_worklog = df.groupby(['budget', 'month']).sum()
+            month_worklog = wdf.groupby(['budget', 'month']).sum()
 
             # результат -- кортеж:
             # 1) генератор последовательности словарей с полями: 

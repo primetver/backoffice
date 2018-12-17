@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'phonenumber_field',
     'pplan.apps.PplanConfig',
-    'jiradata'
+    'jiradata.apps.JiradataConfig'
 ]
 
 MIDDLEWARE = [
