@@ -132,6 +132,7 @@ class Worklog(JiraModel, BudgetCustomField):
         db_table = 'worklog'
         verbose_name = 'запись о работе'
         verbose_name_plural = 'записи о выполнении работ'
+        default_permissions = ('change', 'delete', 'view')
         
     id = md.DecimalField('ID', primary_key=True, max_digits=18, decimal_places=0)
     #issueid = md.ForeignKey(JiraIssue, db_column='issueid', on_delete=md.DO_NOTHING, verbose_name='Запрос')
