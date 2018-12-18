@@ -53,7 +53,12 @@ class WorklogReportAdmin(JiraAdmin):
     '''
     Отчет о месячной фактической загрузке сотрудника в проектах
     '''
+    
     change_list_template = 'admin/workload_user_change_list.html'
+
+    # Начальный год за который имеет смысл смотреть выборку данных
+    # TODO: параметр настройки
+    start_from = 2014 
 
     class ReportListFilter(admin.SimpleListFilter):
         # Замена функции выбора, так чтобы значение по умолчанию вместо "Все" было "Текущий"
@@ -83,7 +88,15 @@ class WorklogReportAdmin(JiraAdmin):
         def lookups(self, request, model_admin):
             # перечень для выбора доступен только с правом jiradata.view_all
             if request.user.has_perm('jiradata.view_all'):
-                users = Worklog.objects.values_list('author', flat=True).distinct()
+                # Выбор года для ограничения списка пользователей
+                try:
+                    year = int(request.GET.get('year'))
+                except TypeError: 
+                    year = None
+                year = year or timezone.now().year
+
+                qs = model_admin.get_queryset(request).filter(startdate__year=year)
+                users = qs.values_list('author', flat=True).distinct()
                 return ( (user, JiraUser.objects.filter(user_name=user).first() or user) for user in users )
             return ()
             
@@ -101,14 +114,16 @@ class WorklogReportAdmin(JiraAdmin):
         parameter_name = 'year'
 
         def lookups(self, request, model_admin):
-            qs = model_admin.get_queryset(request).order_by('startdate')
+            qs = model_admin.get_queryset(request).order_by('startdate').filter(
+                startdate__year__gte=WorklogReportAdmin.start_from
+                )
             
             # ограничение диапазона данными по себе, если нет прав смотреть по всем
             if not request.user.has_perm('jiradata.view_all'):
                 qs = qs.filter(author=request.user.username)
 
             try:
-                first_year = qs.first().startdate.year
+                first_year = qs.first().startdate.year 
                 last_year = qs.last().startdate.year
                 return ( (year, year) for year in range(first_year, last_year + 1) )
             except (AttributeError):

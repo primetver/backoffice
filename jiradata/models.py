@@ -37,7 +37,7 @@ class BudgetCustomField:
         self._issueid = id
 
     def get_issueid(self):
-        # метод, возвращающий id запроса должнен быть переопределен в дочерних классах
+        # метод, возвращающий id запроса должен быть переопределен в дочерних классах
         return self._issueid
 
     def budget_id_name(self):
@@ -70,8 +70,8 @@ class JiraUser(JiraModel):
     '''
     class Meta(JiraModel.Meta):
         db_table = 'cwd_user'
-        verbose_name = 'пользователь Jira'
-        verbose_name_plural = 'пользователи Jira'
+        verbose_name = 'пользователь'
+        verbose_name_plural = 'пользователи'
 
     id = md.DecimalField('ID', primary_key=True, max_digits=18, decimal_places=0)
     directory_id = md.DecimalField('ID', max_digits=18, decimal_places=0)
@@ -93,8 +93,8 @@ class JiraIssue(JiraModel, BudgetCustomField):
     '''
     class Meta(JiraModel.Meta):
         db_table = 'jiraissue'
-        verbose_name = 'запрос Jira'
-        verbose_name_plural = 'запросы Jira'
+        verbose_name = 'запрос'
+        verbose_name_plural = 'запросы'
         
     id = md.DecimalField('ID', primary_key=True, max_digits=18, decimal_places=0)
     issuenum = md.DecimalField('Номер', max_digits=18, decimal_places=0)
@@ -132,8 +132,7 @@ class Worklog(JiraModel, BudgetCustomField):
         db_table = 'worklog'
         verbose_name = 'запись о работе'
         verbose_name_plural = 'записи о выполнении работ'
-        default_permissions = ('change', 'delete', 'view')
-        
+                
     id = md.DecimalField('ID', primary_key=True, max_digits=18, decimal_places=0)
     #issueid = md.ForeignKey(JiraIssue, db_column='issueid', on_delete=md.DO_NOTHING, verbose_name='Запрос')
     issueid = md.DecimalField('ID Запроса', max_digits=18, decimal_places=0)
@@ -242,7 +241,7 @@ class CustomfieldOption(JiraModel):
 
 class WorklogReport(Worklog):
     ''' 
-    Прокси-модель для агрегированного отчета о фактической загрузке
+    Прокси-модель для отчета о фактической загрузке сотрудника
     '''
     class Meta():
         proxy = True
