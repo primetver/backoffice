@@ -1,0 +1,44 @@
+{% extends 'admin/change_list.html' %}
+
+{% block content_title %}
+    <h1>Нормы рабочего времени за {{ year }} год</p>
+{% endblock %}
+
+{% block result_list %}
+
+<div class="results">
+  <table>
+    <thead>
+      <tr>
+        <th>
+          <div class="text">
+            <a href="#">Период</a>
+          </div>
+        </th>
+        {% for h in header %}
+        <th>
+          <div class="text" align="right">
+            <a href="#">{{ h }}</a>
+          </div>
+        </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+        {% for row in summary %}
+        <tr class="{% cycle 'row1' 'row2' as rowcolors %}">
+            <td> {{ row.name }} </td>
+            {% for s in row.stat %}
+            <td align="right">
+                {{ s | default:'' | floatformat:0 }}
+            </td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+  </table>
+</div>
+
+{% endblock %}
+
+{% block pagination %}{% endblock %}
