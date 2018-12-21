@@ -49,13 +49,15 @@ def is_holiday(date):
     else:
         return date.weekday() in WEEKEND
 
+def days(fromdate, todate):
+    return (todate - fromdate).days + 1
 
 def workdayholidayhours(fromdate, todate):
     '''
     Расчет числа рабочих дней, выходных и рабочих часов в заданных границах
     '''
     # перечень дней в заданных границах
-    daygenerator = (fromdate + timedelta(x) for x in range((todate - fromdate).days + 1))
+    daygenerator = ( fromdate + timedelta(x) for x in range(days(fromdate, todate)) )
     
     # словарь специальных дней (день, часов) из производственного календаря
     qs = SpecialDay.objects.filter(date__range=(fromdate, todate))
@@ -75,10 +77,6 @@ def workdayholidayhours(fromdate, todate):
 
     # итоговый подсчет числа дней и часов
     return sum(result_list[0]), sum(result_list[1]), sum(result_list[2])
-
-
-def days(fromdate, todate):
-    return (todate - fromdate).days
 
 def workdays(fromdate, todate):
     return workdayholidayhours(fromdate, todate)[0]
