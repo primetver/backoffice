@@ -41,6 +41,43 @@ class HolidayNameAdmin(admin.ModelAdmin):
     actions = (make_published, make_published_next)
 
 
+class YearFilter(admin.SimpleListFilter):
+    '''
+    Фильтр отображения по годам
+    '''
+    # Human-readable title which will be displayed in the
+    # right admin sidebar just above the filter options.
+    title = 'Данные за год'
+
+    # Parameter for the filter that will be used in the URL query.
+    parameter_name = 'date__year'
+
+    # Замена функции выбора, так чтобы значение по умолчанию вместо "Все" было "Текущий"
+    def choices(self, changelist):
+        yield {
+            'selected': self.value() is None,
+            'query_string': changelist.get_query_string(remove=[self.parameter_name]),
+            'display': 'Текущий',
+        }
+        for lookup, title in self.lookup_choices:
+            yield {
+                'selected': self.value() == str(lookup),
+                'query_string': changelist.get_query_string({self.parameter_name: lookup}),
+                'display': title,
+            }
+    # Перечень значений фильтра для выбора
+    def lookups(self, request, model_admin):
+        qs = model_admin.get_queryset(request).order_by('date')
+
+        first_year = qs.first().date.year
+        last_year = qs.last().date.year
+        
+        return ( (year, year) for year in range(first_year, last_year + 1) )
+
+    def queryset(self, request, queryset):
+        year = self.value() or timezone.now().year
+        return queryset.filter(date__year=year)
+
 
 @admin.register(SpecialDay)
 class SpecialDayAdmin(admin.ModelAdmin):
@@ -48,7 +85,7 @@ class SpecialDayAdmin(admin.ModelAdmin):
     Редактирование календаря особых дней
     '''
     list_display = ('date', 'daytype', 'dayname')
-    list_filter = ('date', 'daytype', 'dayname') 
+    list_filter = (YearFilter, 'daytype', 'dayname') 
     date_hierarchy = 'date'   
 
 
@@ -58,41 +95,6 @@ class WorktimeStandardsAdmin(admin.ModelAdmin):
     Отчет по нормам рабочего времени 
     '''
     change_list_template = 'admin/worktime_standards_change_list.html'
-
-    # Фильтр отображения по годам
-    class YearFilter(admin.SimpleListFilter):
-        # Human-readable title which will be displayed in the
-        # right admin sidebar just above the filter options.
-        title = 'Данные за год'
-
-        # Parameter for the filter that will be used in the URL query.
-        parameter_name = 'year'
-
-        # Замена функции выбора, так чтобы значение по умолчанию вместо "Все" было "Текущий"
-        def choices(self, changelist):
-            yield {
-                'selected': self.value() is None,
-                'query_string': changelist.get_query_string(remove=[self.parameter_name]),
-                'display': 'Текущий',
-            }
-            for lookup, title in self.lookup_choices:
-                yield {
-                    'selected': self.value() == str(lookup),
-                    'query_string': changelist.get_query_string({self.parameter_name: lookup}),
-                    'display': title,
-                }
-        # Перечень значений фильтра для выбора
-        def lookups(self, request, model_admin):
-            qs = model_admin.get_queryset(request).order_by('date')
-
-            first_year = qs.first().date.year
-            last_year = qs.last().date.year
-            
-            return ( (year, year) for year in range(first_year, last_year + 1) )
-
-        def queryset(self, request, queryset):
-            # не фильтруем, фильтр по датам вычисляется в changelist_view()    
-            return queryset
 
     list_display_links = None
     list_filter = (YearFilter,)
@@ -111,8 +113,7 @@ class WorktimeStandardsAdmin(admin.ModelAdmin):
 
         try:
             cl = response.context_data['cl']
-            qs = cl.queryset
-            year = int(cl.get_filters_params().get("year", timezone.now().year))
+            year = int(cl.get_filters_params().get("date__year", timezone.now().year))
         except (AttributeError, KeyError, TypeError, ValueError):
             return response
 
