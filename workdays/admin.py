@@ -75,7 +75,10 @@ class YearFilter(admin.SimpleListFilter):
         return ( (year, year) for year in range(first_year, last_year + 1) )
 
     def queryset(self, request, queryset):
-        year = self.value() or timezone.now().year
+        try:
+            year = date(int(self.value()), 1, 1).year
+        except:
+            year = timezone.now().year
         return queryset.filter(date__year=year)
 
 
@@ -112,9 +115,10 @@ class WorktimeStandardsAdmin(admin.ModelAdmin):
         )
 
         try:
-            cl = response.context_data['cl']
-            year = int(cl.get_filters_params().get("date__year", timezone.now().year))
+            param = request.GET.get('date__year') or timezone.now().year
+            year = date(int(param), 1, 1).year
         except (AttributeError, KeyError, TypeError, ValueError):
+            self.message_user(request, f'Указан ошибочный параметр, выберите параметр из фильтра', messages.ERROR)
             return response
 
         response.context_data['year'] = year
