@@ -1,7 +1,7 @@
 {% extends 'admin/change_list.html' %}
 
 {% block content_title %}
-    <h1>Фактическая загрузка по проектам, час.</h1>
+    <h1>Фактическая загрузка по проектам</h1>
     <p>Участник проекта: {{ member | default:"не выбран" }}</p>
 {% endblock %}
 
@@ -17,13 +17,27 @@
           </div>
         </th>
         {% for m in months %}
-        <th>
+        <th colspan="2">
           <div class="text" align="right">
             <a href="#">{{ m | date:"Y.m" }}</a>
           </div>
         </th>
         {% endfor %}
       </tr>
+      <tr>
+        <th></th>
+        {% for m in months %}
+        <th>
+          <div class="text" align="right">
+            <a href="#">час.</a>
+          </div>
+        </th>
+        <th>
+          <div class="text" align="right">
+            <a href="#">%</a>
+          </div>
+        </th>
+        {% endfor %}
     </thead>
     <tbody>
         {% for row in summary %}
@@ -33,6 +47,9 @@
             <td align="right">
                 {{ b.hours | default:'' | floatformat:2 }}
             </td>
+            <td align="right" style="color:#4542f4">
+                <strong>{{ b.load | default:'' | floatformat:2 }}</strong>
+            </td>
             {% endfor %}
         </tr>
         {% endfor %}
@@ -41,8 +58,24 @@
             <td><strong> ВСЕГО: </strong></td>
             {% for b in total.workload %}
             <td align="right">
-                <strong>{{ b.hours | default:'' | floatformat:2 }}</strong>
+                {{ b.hours| default:'' | floatformat:2 }}
             </td>
+            {% if b.load < 99.99 %}
+            <td align="right" style="color:#c51616">
+            {% else %}
+            <td align="right" style="color:#03941b">
+            {% endif %} 
+                <strong>{{ b.load | default:'' | floatformat:2 }}</strong>
+            </td>
+            {% endfor %}
+        </tr>
+        <tr class="{% cycle rowcolors %}">
+            <td><strong> НОРМА: </strong></td>
+            {% for n in norma %}
+            <td align="right">
+                {{ n | default:'' | floatformat:2 }}
+            </td>
+            <td></td>
             {% endfor %}
         </tr>
         {% endif %}

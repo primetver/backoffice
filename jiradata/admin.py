@@ -1,12 +1,15 @@
 from datetime import date, timedelta
+from decimal import Decimal
 
 from django.contrib import admin
 from django.utils import timezone
 from monthdelta import monthdelta, monthmod
 
+from workdays.utils import workdayholidayhours
+
 from .models import Customfield, JiraIssue, JiraUser, Worklog, WorklogReport
 
-COLUMNS = 18
+COLUMNS = 12
 
 # Register your models here.
 
@@ -166,11 +169,14 @@ class WorklogReportAdmin(JiraAdmin):
                 month_from = date(date_from.year, date_from.month, 1)
 
             month_list = [month_from + monthdelta(i) for i in range(COLUMNS)]
+            # список норм рабочего времени
+            month_norma = [Decimal(workdayholidayhours(m, m + monthdelta(1) - timedelta(days=1))[2]) for m in month_list]
         except (AttributeError, KeyError, ValueError):
             return response
 
         response.context_data['months'] = month_list
         response.context_data['member'] = JiraUser.objects.filter(user_name=user).first()
-        response.context_data['summary'], response.context_data['total'] = qs.get_workload(month_list, user)
+        response.context_data['summary'], response.context_data['total'] = qs.get_workload(month_list, user, month_norma)
+        response.context_data['norma'] = month_norma
         
         return response

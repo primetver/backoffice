@@ -264,7 +264,7 @@ class WorklogReport(Worklog):
         Дополненный класс запроса для вывода агрегированных затрат времени по пользователю
         '''
         # Формирование набора данных  
-        def get_workload(self, month_list, user, month_hours=None):
+        def get_workload(self, month_list, user, month_norma=None):
              # фильтрация запроса по времени и пользователю
             qs = self.filter(
                 startdate__range=(month_list[0], month_list[-1]+monthdelta(1)), 
@@ -296,13 +296,13 @@ class WorklogReport(Worklog):
             wdf['month'] = wdf['startdate'].map(lambda x: date(year=x.year, month=x.month, day=1))
             wdf['hours'] =  wdf['timeworked'] / 3600
             
-            # рассчет процента загрузки, если передана карта нормы рабочих часов по месяцам
-            # -1% если норма для месяца отсутствует (признак ошибки)
-            if month_hours:
-                wdf['load'] = wdf.apply(
-                    (lambda x: x['hours'] / month_hours.get(x['month'], -x['hours']*100) * 100),
-                    asix=1
-                )
+            # расчет процента загрузки, если передан список норм рабочих часов по месяцам
+            if month_norma:
+                ndf = pd.DataFrame(month_norma, index=month_list, columns=['norma'])
+                wdf = pd.merge(wdf, ndf, left_on='month', right_index=True)
+                # расчет % загрузки по нормативу рабочих часов в месяц
+                wdf['load'] = wdf['hours'] / wdf['norma'] * 100
+                del wdf['norma']
 
             del wdf['startdate']; del wdf['timeworked']
 
