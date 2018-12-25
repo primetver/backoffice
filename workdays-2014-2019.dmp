@@ -1,0 +1,1372 @@
+[
+{
+    "model": "workdays.holidayname",
+    "pk": 1,
+    "fields": {
+        "dayname": "\u041d\u043e\u0432\u043e\u0433\u043e\u0434\u043d\u0438\u0435 \u043a\u0430\u043d\u0438\u043a\u0443\u043b\u044b",
+        "month": 1,
+        "day": 1,
+        "count": 8
+    }
+},
+{
+    "model": "workdays.holidayname",
+    "pk": 2,
+    "fields": {
+        "dayname": "\u0420\u043e\u0436\u0434\u0435\u0441\u0442\u0432\u043e \u0425\u0440\u0438\u0441\u0442\u043e\u0432\u043e",
+        "month": 1,
+        "day": 7,
+        "count": 1
+    }
+},
+{
+    "model": "workdays.holidayname",
+    "pk": 3,
+    "fields": {
+        "dayname": "\u0414\u0435\u043d\u044c \u0437\u0430\u0449\u0438\u0442\u043d\u0438\u043a\u0430 \u041e\u0442\u0435\u0447\u0435\u0441\u0442\u0432\u0430",
+        "month": 2,
+        "day": 23,
+        "count": 1
+    }
+},
+{
+    "model": "workdays.holidayname",
+    "pk": 4,
+    "fields": {
+        "dayname": "\u041c\u0435\u0436\u0434\u0443\u043d\u0430\u0440\u043e\u0434\u043d\u044b\u0439 \u0436\u0435\u043d\u0441\u043a\u0438\u0439 \u0434\u0435\u043d\u044c",
+        "month": 3,
+        "day": 8,
+        "count": 1
+    }
+},
+{
+    "model": "workdays.holidayname",
+    "pk": 5,
+    "fields": {
+        "dayname": "\u041f\u0440\u0430\u0437\u0434\u043d\u0438\u043a \u0432\u0435\u0441\u043d\u044b \u0438 \u0442\u0440\u0443\u0434\u0430",
+        "month": 5,
+        "day": 1,
+        "count": 1
+    }
+},
+{
+    "model": "workdays.holidayname",
+    "pk": 6,
+    "fields": {
+        "dayname": "\u0414\u0435\u043d\u044c \u041f\u043e\u0431\u0435\u0434\u044b",
+        "month": 5,
+        "day": 9,
+        "count": 1
+    }
+},
+{
+    "model": "workdays.holidayname",
+    "pk": 7,
+    "fields": {
+        "dayname": "\u0414\u0435\u043d\u044c \u0420\u043e\u0441\u0441\u0438\u0438",
+        "month": 6,
+        "day": 12,
+        "count": 1
+    }
+},
+{
+    "model": "workdays.holidayname",
+    "pk": 8,
+    "fields": {
+        "dayname": "\u0414\u0435\u043d\u044c \u043d\u0430\u0440\u043e\u0434\u043d\u043e\u0433\u043e \u0435\u0434\u0438\u043d\u0441\u0442\u0432\u0430",
+        "month": 11,
+        "day": 4,
+        "count": 1
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 20,
+    "fields": {
+        "date": "2018-01-07",
+        "daytype": "HL",
+        "dayname": 2,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 21,
+    "fields": {
+        "date": "2018-02-23",
+        "daytype": "HL",
+        "dayname": 3,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 22,
+    "fields": {
+        "date": "2018-03-08",
+        "daytype": "HL",
+        "dayname": 4,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 23,
+    "fields": {
+        "date": "2018-05-01",
+        "daytype": "HL",
+        "dayname": 5,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 24,
+    "fields": {
+        "date": "2018-05-02",
+        "daytype": "HL",
+        "dayname": 5,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 25,
+    "fields": {
+        "date": "2018-05-09",
+        "daytype": "HL",
+        "dayname": 6,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 26,
+    "fields": {
+        "date": "2018-06-12",
+        "daytype": "HL",
+        "dayname": 7,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 27,
+    "fields": {
+        "date": "2018-11-04",
+        "daytype": "HL",
+        "dayname": 8,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 28,
+    "fields": {
+        "date": "2018-12-31",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 29,
+    "fields": {
+        "date": "2018-01-01",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 30,
+    "fields": {
+        "date": "2018-01-02",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 31,
+    "fields": {
+        "date": "2018-01-03",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 32,
+    "fields": {
+        "date": "2018-01-04",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 33,
+    "fields": {
+        "date": "2018-01-05",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 34,
+    "fields": {
+        "date": "2018-01-06",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 35,
+    "fields": {
+        "date": "2018-01-08",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 37,
+    "fields": {
+        "date": "2018-02-22",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 38,
+    "fields": {
+        "date": "2018-03-07",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 39,
+    "fields": {
+        "date": "2018-03-09",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 40,
+    "fields": {
+        "date": "2018-04-28",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 41,
+    "fields": {
+        "date": "2018-04-30",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 42,
+    "fields": {
+        "date": "2018-05-08",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 43,
+    "fields": {
+        "date": "2018-06-09",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 44,
+    "fields": {
+        "date": "2018-06-11",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 145,
+    "fields": {
+        "date": "2019-01-01",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 146,
+    "fields": {
+        "date": "2019-01-02",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 147,
+    "fields": {
+        "date": "2019-01-03",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 148,
+    "fields": {
+        "date": "2019-01-04",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 149,
+    "fields": {
+        "date": "2019-01-05",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 150,
+    "fields": {
+        "date": "2019-01-06",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 151,
+    "fields": {
+        "date": "2019-01-07",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 152,
+    "fields": {
+        "date": "2019-01-08",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 153,
+    "fields": {
+        "date": "2019-02-22",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 154,
+    "fields": {
+        "date": "2019-03-07",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 155,
+    "fields": {
+        "date": "2019-03-08",
+        "daytype": "HL",
+        "dayname": 4,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 156,
+    "fields": {
+        "date": "2019-04-30",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 157,
+    "fields": {
+        "date": "2019-05-01",
+        "daytype": "HL",
+        "dayname": 5,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 158,
+    "fields": {
+        "date": "2019-05-02",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 159,
+    "fields": {
+        "date": "2019-05-08",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 160,
+    "fields": {
+        "date": "2019-05-09",
+        "daytype": "HL",
+        "dayname": 6,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 161,
+    "fields": {
+        "date": "2019-06-11",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 162,
+    "fields": {
+        "date": "2019-06-12",
+        "daytype": "HL",
+        "dayname": 7,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 164,
+    "fields": {
+        "date": "2019-11-04",
+        "daytype": "HL",
+        "dayname": 8,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 165,
+    "fields": {
+        "date": "2019-05-03",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 166,
+    "fields": {
+        "date": "2019-05-10",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 167,
+    "fields": {
+        "date": "2019-12-31",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 183,
+    "fields": {
+        "date": "2017-01-01",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 184,
+    "fields": {
+        "date": "2017-01-02",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 185,
+    "fields": {
+        "date": "2017-01-03",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 186,
+    "fields": {
+        "date": "2017-01-04",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 187,
+    "fields": {
+        "date": "2017-01-05",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 188,
+    "fields": {
+        "date": "2017-01-06",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 189,
+    "fields": {
+        "date": "2017-01-07",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 190,
+    "fields": {
+        "date": "2017-01-08",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 191,
+    "fields": {
+        "date": "2017-02-22",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 192,
+    "fields": {
+        "date": "2017-02-23",
+        "daytype": "HL",
+        "dayname": 3,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 193,
+    "fields": {
+        "date": "2017-03-07",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 194,
+    "fields": {
+        "date": "2017-03-08",
+        "daytype": "HL",
+        "dayname": 4,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 195,
+    "fields": {
+        "date": "2017-05-01",
+        "daytype": "HL",
+        "dayname": 5,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 196,
+    "fields": {
+        "date": "2017-05-08",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 197,
+    "fields": {
+        "date": "2017-05-09",
+        "daytype": "HL",
+        "dayname": 6,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 198,
+    "fields": {
+        "date": "2017-06-12",
+        "daytype": "HL",
+        "dayname": 7,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 199,
+    "fields": {
+        "date": "2017-11-03",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 200,
+    "fields": {
+        "date": "2017-02-24",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 201,
+    "fields": {
+        "date": "2017-11-06",
+        "daytype": "HL",
+        "dayname": 8,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 202,
+    "fields": {
+        "date": "2018-12-29",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 203,
+    "fields": {
+        "date": "2018-11-05",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 204,
+    "fields": {
+        "date": "2015-12-31",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 205,
+    "fields": {
+        "date": "2016-01-01",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 206,
+    "fields": {
+        "date": "2016-01-02",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 207,
+    "fields": {
+        "date": "2016-01-03",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 208,
+    "fields": {
+        "date": "2016-01-04",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 209,
+    "fields": {
+        "date": "2016-01-05",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 210,
+    "fields": {
+        "date": "2016-01-06",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 211,
+    "fields": {
+        "date": "2016-01-07",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 212,
+    "fields": {
+        "date": "2016-01-08",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 213,
+    "fields": {
+        "date": "2016-02-20",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 214,
+    "fields": {
+        "date": "2016-02-23",
+        "daytype": "HL",
+        "dayname": 3,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 215,
+    "fields": {
+        "date": "2016-03-07",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 216,
+    "fields": {
+        "date": "2016-03-08",
+        "daytype": "HL",
+        "dayname": 4,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 217,
+    "fields": {
+        "date": "2016-05-02",
+        "daytype": "HL",
+        "dayname": 5,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 218,
+    "fields": {
+        "date": "2016-05-09",
+        "daytype": "HL",
+        "dayname": 6,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 219,
+    "fields": {
+        "date": "2016-06-13",
+        "daytype": "HL",
+        "dayname": 7,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 220,
+    "fields": {
+        "date": "2016-11-03",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 221,
+    "fields": {
+        "date": "2016-11-04",
+        "daytype": "HL",
+        "dayname": 8,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 222,
+    "fields": {
+        "date": "2016-02-22",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 223,
+    "fields": {
+        "date": "2016-05-03",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 224,
+    "fields": {
+        "date": "2014-12-31",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 225,
+    "fields": {
+        "date": "2015-01-01",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 226,
+    "fields": {
+        "date": "2015-01-02",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 227,
+    "fields": {
+        "date": "2015-01-03",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 228,
+    "fields": {
+        "date": "2015-01-04",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 229,
+    "fields": {
+        "date": "2015-01-05",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 230,
+    "fields": {
+        "date": "2015-01-06",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 231,
+    "fields": {
+        "date": "2015-01-07",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 232,
+    "fields": {
+        "date": "2015-01-08",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 233,
+    "fields": {
+        "date": "2015-02-23",
+        "daytype": "HL",
+        "dayname": 3,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 234,
+    "fields": {
+        "date": "2015-03-09",
+        "daytype": "HL",
+        "dayname": 4,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 235,
+    "fields": {
+        "date": "2015-04-30",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 236,
+    "fields": {
+        "date": "2015-05-01",
+        "daytype": "HL",
+        "dayname": 5,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 237,
+    "fields": {
+        "date": "2015-05-08",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 238,
+    "fields": {
+        "date": "2015-05-11",
+        "daytype": "HL",
+        "dayname": 6,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 239,
+    "fields": {
+        "date": "2015-06-11",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 240,
+    "fields": {
+        "date": "2015-06-12",
+        "daytype": "HL",
+        "dayname": 7,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 241,
+    "fields": {
+        "date": "2015-11-03",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 242,
+    "fields": {
+        "date": "2015-11-04",
+        "daytype": "HL",
+        "dayname": 8,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 243,
+    "fields": {
+        "date": "2015-01-09",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 244,
+    "fields": {
+        "date": "2015-05-04",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 246,
+    "fields": {
+        "date": "2014-01-01",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 247,
+    "fields": {
+        "date": "2014-01-02",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 248,
+    "fields": {
+        "date": "2014-01-03",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 249,
+    "fields": {
+        "date": "2014-01-04",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 250,
+    "fields": {
+        "date": "2014-01-05",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 251,
+    "fields": {
+        "date": "2014-01-06",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 252,
+    "fields": {
+        "date": "2014-01-07",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 253,
+    "fields": {
+        "date": "2014-01-08",
+        "daytype": "HL",
+        "dayname": 1,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 254,
+    "fields": {
+        "date": "2014-02-24",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 255,
+    "fields": {
+        "date": "2014-03-07",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 256,
+    "fields": {
+        "date": "2014-03-10",
+        "daytype": "HL",
+        "dayname": 4,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 257,
+    "fields": {
+        "date": "2014-04-30",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 258,
+    "fields": {
+        "date": "2014-05-01",
+        "daytype": "HL",
+        "dayname": 5,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 259,
+    "fields": {
+        "date": "2014-05-08",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 260,
+    "fields": {
+        "date": "2014-05-09",
+        "daytype": "HL",
+        "dayname": 6,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 261,
+    "fields": {
+        "date": "2014-06-11",
+        "daytype": "SH",
+        "dayname": null,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 262,
+    "fields": {
+        "date": "2014-06-12",
+        "daytype": "HL",
+        "dayname": 7,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 263,
+    "fields": {
+        "date": "2014-11-03",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 264,
+    "fields": {
+        "date": "2014-11-04",
+        "daytype": "HL",
+        "dayname": 8,
+        "comment": null
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 265,
+    "fields": {
+        "date": "2014-05-02",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": ""
+    }
+},
+{
+    "model": "workdays.specialday",
+    "pk": 266,
+    "fields": {
+        "date": "2014-06-13",
+        "daytype": "HL",
+        "dayname": null,
+        "comment": ""
+    }
+}
+]
