@@ -37,8 +37,8 @@ class SpecialDay(md.Model):
     Календарь праздников, сокращенных и рабочих выходных дней
     '''
     class Meta():
-        verbose_name = 'день производственного календаря'
-        verbose_name_plural = 'дни производственного календаря'
+        verbose_name = 'нестандартный день календаря'
+        verbose_name_plural = 'нестандартные дни календаря'
         ordering = ('date',)
 
 
@@ -54,6 +54,7 @@ class SpecialDay(md.Model):
     date = md.DateField('Дата', db_index=True, unique=True)
     daytype = md.CharField('Тип дня', max_length=2, default=HOLIDAY, choices=DAYTYPE_CHOICES)
     dayname = md.ForeignKey(HolidayName, null=True, blank=True, on_delete=md.PROTECT, verbose_name='Название')
+    comment = md.TextField('Комментарий', null=True, blank=True)
 
     def workdayholidayhours(self, hours):
         if self.daytype == SpecialDay.HOLIDAY:

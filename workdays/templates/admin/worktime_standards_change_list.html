@@ -1,7 +1,7 @@
 {% extends 'admin/change_list.html' %}
 
 {% block content_title %}
-    <h1>Нормы рабочего времени за {{ year }} год</p>
+    <h1>Нормы рабочего времени за {{ year }} год</h1>
 {% endblock %}
 
 {% block result_list %}
@@ -15,9 +15,22 @@
             <a href="#">Период</a>
           </div>
         </th>
+        <th colspan="3">
+          <div class="text" align="center">
+            <a href="#">Дней</a>
+          </div>
+        </th>
+        <th colspan="3">
+          <div class="text" align="center">
+            <a href="#">Рабочих часов</a>
+          </div>
+        </th>
+      </tr>
+      <tr>
+        <th></th>
         {% for h in header %}
         <th>
-          <div class="text" align="right">
+          <div class="text" align="center">
             <a href="#">{{ h }}</a>
           </div>
         </th>
@@ -27,9 +40,9 @@
     <tbody>
         {% for row in summary %}
         <tr class="{% cycle 'row1' 'row2' as rowcolors %}">
-            <td> {{ row.name }} </td>
+            <td>{{ row.name }}</td>
             {% for s in row.stat %}
-            <td align="right">
+            <td align="center">
                 {{ s | default:'' | floatformat:0 }}
             </td>
             {% endfor %}

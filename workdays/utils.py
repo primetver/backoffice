@@ -76,7 +76,10 @@ def workdayholidayhours(fromdate, todate):
     result_list = list(zip(*dayhours))
 
     # итоговый подсчет числа дней и часов
-    return sum(result_list[0]), sum(result_list[1]), sum(result_list[2])
+    total_days = sum(result_list[0])
+    total_holidays = sum(result_list[1])
+    total_hours = sum(result_list[2])
+    return total_days, total_holidays, total_hours, total_hours * 0.7, total_hours * 0.5  
 
 def workdays(fromdate, todate):
     return workdayholidayhours(fromdate, todate)[0]
