@@ -234,10 +234,94 @@ class CustomfieldOption(JiraModel):
     def __str__(self):
         return self.customvalue
 
-
 #
 # Отчеты
 #
+
+class WorklogSummary(Worklog):
+    ''' 
+    Прокси-модель для сводного отчета о фактической загрузке
+    '''
+    class Meta():
+        proxy = True
+        verbose_name = 'фактическая загрузка по месяцам'
+        verbose_name_plural = 'сводный отчет о фактической загрузке'
+        default_permissions = ('view',)
+
+    class Manager(md.Manager):
+        def get_queryset(self):
+            return WorklogSummary.QuerySet(self.model, using='jira')
+
+    # замена менеджера по умолчанию
+    objects = Manager()
+
+    class QuerySet(md.QuerySet):
+        '''
+        Дополненный класс запроса для вывода сводных затрат времени по месяцам
+        '''
+        # Формирование набора данных  
+        def get_workload(self, month_list, budget=None, month_norma=None):
+             # фильтрация запроса по заданному диапазону
+            qs = self.filter(
+                startdate__range=(month_list[0], month_list[-1] + monthdelta(1)), 
+            )
+
+            # чтение журнала работ во фрейм
+            df = read_frame(
+                qs,
+                fieldnames=[
+                    'author',
+                    'startdate',
+                    'timeworked'            
+                ],
+                index_col = 'issueid'
+            )
+            if df.empty: return ()
+
+            # фильтруем, если задан ID бюджета
+            if budget:
+                # извлекаем уникальный массив задач
+                issues = df.index.unique()
+                # создаем фрейм флагов для задач с заданным ID бюджета
+                bdf = pd.DataFrame(
+                    ( BudgetCustomField(issueid).budget_id() == budget for issueid in issues ),
+                    index=issues,
+                    columns=['budget_flag'])
+                # объединение в один, добавление булевой маски
+                df = pd.merge(df, bdf, left_index=True, right_index=True)
+                # фильтрация по маске
+                df = df[df['budget_flag']]
+                del df['budget_flag']
+                      
+            # рассчитываем требуемые для отчета колонки
+            df['month'] = df['startdate'].map(lambda x: date(year=x.year, month=x.month, day=1))
+            df['hours'] =  df['timeworked'] / 3600
+            
+            # расчет процента загрузки, если передан список норм рабочих часов по месяцам
+            if month_norma:
+                ndf = pd.DataFrame(month_norma, index=month_list, columns=['norma'])
+                df = pd.merge(df, ndf, left_on='month', right_index=True)
+                # расчет % загрузки по нормативу рабочих часов в месяц
+                df['load'] = df['hours'] / df['norma'] * 100
+                del df['norma']
+
+            del df['startdate']; del df['timeworked']
+
+            # агрегирование по авторам и месяцам, получаем фрейм с иерархическим индексом: автор, месяц
+            month_worklog = df.groupby(['author', 'month']).sum()
+
+            # результат генератор последовательности словарей с полями: 
+            #   - автор, 
+            #   - список помесячных записей о загрузке для каждого месяца из переданного списка
+            #     (отсутствующие данные заполняются нулями)
+            return (
+                {
+                    'author': a,
+                    # сбрасываем индекс по авторам, переиндексируем по заданному списку месяцев, выводим в список словарей
+                    'workload': worklog.reset_index(level=0, drop=True).reindex(month_list, fill_value=0).to_dict('records')
+                } for a, worklog in month_worklog.groupby(level='author')
+            )
+
 
 class WorklogReport(Worklog):
     ''' 
@@ -267,7 +351,7 @@ class WorklogReport(Worklog):
         def get_workload(self, month_list, user, month_norma=None):
              # фильтрация запроса по времени и пользователю
             qs = self.filter(
-                startdate__range=(month_list[0], month_list[-1]+monthdelta(1)), 
+                startdate__range=(month_list[0], month_list[-1] + monthdelta(1)), 
                 author=user
             )
 
