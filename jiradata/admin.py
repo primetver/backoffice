@@ -1,5 +1,4 @@
 from datetime import date, timedelta
-from decimal import Decimal
 
 from django.contrib import admin
 from django.utils import timezone
@@ -222,8 +221,7 @@ class WorklogSummaryAdmin(BaseReportAdmin):
         month_list = [date(year, 1+i, 1) for i in range(BaseReportAdmin.COLUMNS)]
 
         # список норм рабочего времени
-        month_norma = [Decimal(
-            workhours(m, m + monthdelta(1) - timedelta(days=1))) for m in month_list]
+        month_norma = [workhours(m, m + monthdelta(1) - timedelta(days=1)) for m in month_list]
 
         # перечень бюджетов из набора данных или выбранный бюджет
         budget = get_selected_budget(request)
@@ -278,8 +276,7 @@ class WorklogReportAdmin(BaseReportAdmin):
         month_list = [date(year, 1+i, 1) for i in range(BaseReportAdmin.COLUMNS)]
            
         # список норм рабочего времени
-        month_norma = [Decimal(
-            workhours(m, m + monthdelta(1) - timedelta(days=1))) for m in month_list]
+        month_norma = [workhours(m, m + monthdelta(1) - timedelta(days=1)) for m in month_list]
 
         response.context_data['months'] = month_list
         response.context_data['member'] = JiraUser.objects.filter(user_name=user).first()

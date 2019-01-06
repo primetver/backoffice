@@ -19,8 +19,8 @@ class JiraModel(md.Model):
 
     class JiraManager(md.Manager):
         def get_queryset(self):
-            return super().get_queryset().using('jira') 
-    
+            return super().get_queryset().using('jira')
+
     # замена менеджера по умолчанию
     objects = JiraManager()
 
@@ -42,7 +42,7 @@ class BudgetCustomField:
 
     def budget_id_name(self):
         cfv = CustomfieldValue.objects.filter(
-            issue=self.get_issueid(), 
+            issue=self.get_issueid(),
             customfield=BudgetCustomField.id
         ).first()
 
@@ -55,7 +55,7 @@ class BudgetCustomField:
     def budget_id(self):
         return self.budget_id_name()[0]
     budget_id.short_description = 'ID бюджета'
-    
+
     def budget_name(self):
         return self.budget_id_name()[1]
     budget_name.short_description = 'Бюджет проекта'
@@ -63,6 +63,7 @@ class BudgetCustomField:
 #
 #  Модели JIRA
 #
+
 
 class JiraUser(JiraModel):
     '''
@@ -95,7 +96,7 @@ class JiraIssue(JiraModel, BudgetCustomField):
         db_table = 'jiraissue'
         verbose_name = 'запрос'
         verbose_name_plural = 'запросы'
-        
+
     id = md.DecimalField('ID', primary_key=True, max_digits=18, decimal_places=0)
     issuenum = md.DecimalField('Номер', max_digits=18, decimal_places=0)
     project = md.DecimalField('Проект', max_digits=18, decimal_places=0)
@@ -119,7 +120,7 @@ class JiraIssue(JiraModel, BudgetCustomField):
 
     def get_issueid(self):
         return self.id
-                    
+
     def __str__(self):
         return f'{self.issuenum}'
 
@@ -132,10 +133,10 @@ class Worklog(JiraModel, BudgetCustomField):
         db_table = 'worklog'
         verbose_name = 'запись о работе'
         verbose_name_plural = 'записи о выполнении работ'
-                
+
     id = md.DecimalField('ID', primary_key=True, max_digits=18, decimal_places=0)
-    #issueid = md.ForeignKey(JiraIssue, db_column='issueid', on_delete=md.DO_NOTHING, verbose_name='Запрос')
-    issueid = md.DecimalField('ID Запроса', max_digits=18, decimal_places=0)
+    issueid = md.ForeignKey(JiraIssue, db_column='issueid', on_delete=md.CASCADE, verbose_name='Запрос')
+    #issueid = md.DecimalField('ID Запроса', max_digits=18, decimal_places=0)
     author = md.CharField('Создал', max_length=255)
     worklogbody = md.TextField('Содержание работ')
     created = md.DateTimeField('Дата создания')
@@ -153,8 +154,8 @@ class Worklog(JiraModel, BudgetCustomField):
         return issue.summary
 
     def get_issueid(self):
-        return self.issueid       
-        
+        return self.issueid
+
     def __str__(self):
         return f'{self.startdate:%d.%m.%Y} {self.author} {self.worklogbody or ""} {self.hours()} ч.'
 
@@ -167,7 +168,7 @@ class Customfield(JiraModel):
         db_table = 'customfield'
         verbose_name = 'определение пользовательского поля'
         verbose_name_plural = 'определения пользовательских полей'
-        
+
     id = md.DecimalField('ID', primary_key=True, max_digits=18, decimal_places=0)
     customfieldtypekey = md.CharField('Ключ типа поля', max_length=255)
     customfieldsearcherkey = md.CharField('Ключ поиска', max_length=255)
@@ -177,7 +178,7 @@ class Customfield(JiraModel):
     fieldtype = md.DecimalField('Тип поля', max_digits=18, decimal_places=0)
     project = md.DecimalField('Проект', max_digits=18, decimal_places=0)
     issuetype = md.CharField('Тип запроса', max_length=255)
-                
+
     def __str__(self):
         return self.cfname
 
@@ -190,7 +191,7 @@ class CustomfieldValue(JiraModel):
         db_table = 'customfieldvalue'
         verbose_name = 'значение пользовательского поля'
         verbose_name_plural = 'значения пользовательских полей'
-        
+
     id = md.DecimalField('ID', primary_key=True, max_digits=18, decimal_places=0)
     issue = md.DecimalField('Запрос', max_digits=18, decimal_places=0)
     customfield = md.DecimalField('Пользовательское поле', max_digits=18, decimal_places=0)
@@ -210,7 +211,7 @@ class CustomfieldValue(JiraModel):
         value = self.value()
         option = CustomfieldOption.objects.filter(id=value).first().customvalue
         return option or value
-            
+
     def __str__(self):
         return str(self.option_value())
 
@@ -223,20 +224,21 @@ class CustomfieldOption(JiraModel):
         db_table = 'customfieldoption'
         verbose_name = 'опция пользовательского поля'
         verbose_name_plural = 'опции пользовательских полей'
-        
+
     id = md.DecimalField('ID', primary_key=True, max_digits=18, decimal_places=0)
     customfield = md.DecimalField('Пользовательское поле', max_digits=18, decimal_places=0)
     sequence = md.DecimalField('Последовательный номер', max_digits=18, decimal_places=0)
     customvalue = md.CharField('Значение', max_length=255)
     optiontype = md.CharField('Тип значения', max_length=60)
     disabled = md.CharField('Не активно', max_length=60)
-            
+
     def __str__(self):
         return self.customvalue
 
 #
 # Отчеты
 #
+
 
 class WorklogSummary(Worklog):
     ''' 
@@ -259,24 +261,29 @@ class WorklogSummary(Worklog):
         '''
         Дополненный класс запроса для вывода сводных затрат времени по месяцам
         '''
-        # Формирование набора данных  
+        # Формирование набора данных
+
         def get_workload(self, month_list, budget=None, month_norma=None):
              # фильтрация запроса по заданному диапазону
             qs = self.filter(
-                startdate__range=(month_list[0], month_list[-1] + monthdelta(1)), 
+                startdate__range=(
+                    month_list[0], month_list[-1] + monthdelta(1)),
             )
 
             # чтение журнала работ во фрейм
             df = read_frame(
                 qs,
-                fieldnames=[
+                fieldnames=(
                     'author',
                     'startdate',
-                    'timeworked'            
-                ],
-                index_col = 'issueid'
+                    'timeworked'
+                ),
+                index_col='issueid',
+                coerce_float=True,
+                verbose=False
             )
-            if df.empty: return ()
+            if df.empty:
+                return ()
 
             # фильтруем, если задан ID бюджета
             if budget:
@@ -284,19 +291,20 @@ class WorklogSummary(Worklog):
                 issues = df.index.unique()
                 # создаем фрейм флагов для задач с заданным ID бюджета
                 bdf = pd.DataFrame(
-                    ( BudgetCustomField(issueid).budget_id() == budget for issueid in issues ),
+                    (BudgetCustomField(issueid).budget_id() == budget for issueid in issues),
                     index=issues,
-                    columns=['budget_flag'])
+                    columns=('budget_flag',)
+                )
                 # объединение в один, добавление булевой маски
                 df = pd.merge(df, bdf, left_index=True, right_index=True)
                 # фильтрация по маске
                 df = df[df['budget_flag']]
                 del df['budget_flag']
-                      
+
             # рассчитываем требуемые для отчета колонки
             df['month'] = df['startdate'].map(lambda x: date(year=x.year, month=x.month, day=1))
-            df['hours'] =  df['timeworked'] / 3600
-            
+            df['hours'] = df['timeworked'] / 3600
+
             # расчет процента загрузки, если передан список норм рабочих часов по месяцам
             if month_norma:
                 ndf = pd.DataFrame(month_norma, index=month_list, columns=['norma'])
@@ -305,13 +313,14 @@ class WorklogSummary(Worklog):
                 df['load'] = df['hours'] / df['norma'] * 100
                 del df['norma']
 
-            del df['startdate']; del df['timeworked']
+            del df['startdate']
+            del df['timeworked']
 
             # агрегирование по авторам и месяцам, получаем фрейм с иерархическим индексом: автор, месяц
             month_worklog = df.groupby(['author', 'month']).sum()
 
-            # результат генератор последовательности словарей с полями: 
-            #   - автор, 
+            # результат генератор последовательности словарей с полями:
+            #   - автор,
             #   - список помесячных записей о загрузке для каждого месяца из переданного списка
             #     (отсутствующие данные заполняются нулями)
             return (
@@ -347,58 +356,67 @@ class WorklogReport(Worklog):
         '''
         Дополненный класс запроса для вывода агрегированных затрат времени по пользователю
         '''
-        # Формирование набора данных  
+        # Формирование набора данных
+
         def get_workload(self, month_list, user, month_norma=None):
              # фильтрация запроса по времени и пользователю
             qs = self.filter(
-                startdate__range=(month_list[0], month_list[-1] + monthdelta(1)), 
+                startdate__range=(
+                    month_list[0], month_list[-1] + monthdelta(1)),
                 author=user
             )
 
             # чтение журнала работ во фрейм
             df = read_frame(
                 qs,
-                fieldnames=[
+                fieldnames=(
                     'startdate',
-                    'timeworked'            
-                ],
-                index_col = 'issueid'
+                    'timeworked'
+                ),
+                index_col='issueid',
+                coerce_float=True,
+                verbose=False
             )
-            if df.empty: return [], None
+            if df.empty:
+                return (), None
 
             # извлекаем уникальный массив задач
             issues = df.index.unique()
             # создаем фрейм названий бюджетов для задач
             bdf = pd.DataFrame(
-                ( BudgetCustomField(issueid).budget_name() for issueid in issues ),
+                (BudgetCustomField(issueid).budget_name()
+                 for issueid in issues),
                 index=issues,
-                columns=['budget'])
+                columns=('budget',))
             # объединение в один
             wdf = pd.merge(df, bdf, left_index=True, right_index=True)
-            
+
             # рассчитываем требуемые для отчета колонки
-            wdf['month'] = wdf['startdate'].map(lambda x: date(year=x.year, month=x.month, day=1))
-            wdf['hours'] =  wdf['timeworked'] / 3600
-            
+            wdf['month'] = wdf['startdate'].map(
+                lambda x: date(year=x.year, month=x.month, day=1))
+            wdf['hours'] = wdf['timeworked'] / 3600
+
             # расчет процента загрузки, если передан список норм рабочих часов по месяцам
             if month_norma:
-                ndf = pd.DataFrame(month_norma, index=month_list, columns=['norma'])
+                ndf = pd.DataFrame(
+                    month_norma, index=month_list, columns=['norma'])
                 wdf = pd.merge(wdf, ndf, left_on='month', right_index=True)
                 # расчет % загрузки по нормативу рабочих часов в месяц
                 wdf['load'] = wdf['hours'] / wdf['norma'] * 100
                 del wdf['norma']
 
-            del wdf['startdate']; del wdf['timeworked']
+            del wdf['startdate']
+            del wdf['timeworked']
 
             # агрегирование по бюджетам и месяцам, получаем фрейм с иерархическим индексом: проект, месяц
             month_worklog = wdf.groupby(['budget', 'month']).sum()
 
             # результат -- кортеж:
-            # 1) генератор последовательности словарей с полями: 
-            #   - бюджет, 
+            # 1) генератор последовательности словарей с полями:
+            #   - бюджет,
             #   - список помесячных записей о загрузке для каждого месяца из переданного списка
             #     (отсутствующие данные заполняются нулями)
-            # 2) итоговая строка 
+            # 2) итоговая строка
             return (
                 (
                     {
@@ -408,8 +426,30 @@ class WorklogReport(Worklog):
                     } for p, worklog in month_worklog.groupby(level='budget')
                 ),
                 {
-                    # дополнительная итоговая строка 
+                    # дополнительная итоговая строка
                     'workload': month_worklog.groupby('month').sum().reindex(month_list, fill_value=0).to_dict('records')
                 }
-            )    
+            )
 
+
+class WorklogIssues(Worklog):
+    ''' 
+    Прокси-модель для отчета о затратах времени по задачам 
+    '''
+    class Meta():
+        proxy = True
+        verbose_name = 'затраты времени по задаче'
+        verbose_name_plural = 'отчет о затратах времени по задачам'
+        default_permissions = ('view',)
+        permissions = (
+            ("view_all", "Просмотр любого сотрудника"),
+        )
+
+    class Manager(JiraModel.JiraManager):
+        def get_queryset(self):
+            return super().get_queryset() \
+                .values('issueid__issuenum', 'issueid__summary', 'issueid__reporter', 'issueid__created') \
+                .annotate(hours=md.Sum('timeworked') / 3600)
+
+    # замена менеджера по умолчанию
+    objects = Manager()

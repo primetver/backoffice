@@ -3,7 +3,7 @@ autopep8==1.4
 Babel==2.6.0
 dj-database-url==0.5.0
 dj-email-url==0.1.0
-django>=2.1.2
+Django==2.1.5
 django-pandas==0.5.1
 django-phonenumber-field==2.0.1
 environs==4.0.0
@@ -15,6 +15,7 @@ MonthDelta==0.9.1
 numpy==1.15.2
 pandas==0.23.4
 phonenumbers==8.9.13
+psycopg2-binary==2.7.6.1
 pycodestyle==2.4.0
 pylint==2.1.1
 python-dateutil==2.7.3
@@ -22,5 +23,6 @@ python-dotenv==0.9.1
 pytz==2018.5
 rope==0.11.0
 six==1.11.0
+sqlparse==0.2.4
 typed-ast==1.1.0
 wrapt==1.10.11
