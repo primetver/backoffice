@@ -325,7 +325,7 @@ class WorklogSummary(Worklog):
             #     (отсутствующие данные заполняются нулями)
             return (
                 {
-                    'author': a,
+                    'name': a,
                     # сбрасываем индекс по авторам, переиндексируем по заданному списку месяцев, выводим в список словарей
                     'workload': worklog.reset_index(level=0, drop=True).reindex(month_list, fill_value=0).to_dict('records')
                 } for a, worklog in month_worklog.groupby(level='author')
@@ -398,8 +398,7 @@ class WorklogReport(Worklog):
 
             # расчет процента загрузки, если передан список норм рабочих часов по месяцам
             if month_norma:
-                ndf = pd.DataFrame(
-                    month_norma, index=month_list, columns=['norma'])
+                ndf = pd.DataFrame(month_norma, index=month_list, columns=['norma'])
                 wdf = pd.merge(wdf, ndf, left_on='month', right_index=True)
                 # расчет % загрузки по нормативу рабочих часов в месяц
                 wdf['load'] = wdf['hours'] / wdf['norma'] * 100

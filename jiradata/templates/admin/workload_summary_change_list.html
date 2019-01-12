@@ -1,0 +1,70 @@
+{% extends 'admin/change_list.html' %}
+
+{% block content_title %}
+    <h1>Фактическая загрузка по проектам, %</h1>
+    <p>Проекты: {{ projects | join:", " | default:"не выбраны" }}</p>
+{% endblock %}
+
+{% block result_list %}
+
+<div class="results">
+  <table>
+    <thead>
+      <tr>
+        <th>
+          <div class="text">
+            <a href="#">Участник проекта</a>
+          </div>
+        </th>
+        {% for m in months %}
+        <th colspan="2">
+          <div class="text" align="right">
+            <a href="#">{{ m | date:"Y.m" }}</a>
+          </div>
+        </th>
+        {% endfor %}
+      </tr>
+      <tr>
+        <th></th>
+        {% for m in months %}
+        <th>
+          <div class="text" align="right">
+            <a href="#">час.</a>
+          </div>
+        </th>
+        <th>
+          <div class="text" align="right">
+            <a href="#">%</a>
+          </div>
+        </th>
+        {% endfor %}
+    </thead>
+    <tbody>
+        {% for row in summary %}
+        <tr class="{% cycle 'row1' 'row2' %}">
+            <td> {{ row.name }} </td>
+            {% for b in row.workload %}
+            <td align="right">
+              {{ b.hours | default:'' | floatformat:2 }}
+            </td>
+            {% if b.load < 99.99 %}
+              {% if all_projects %}
+              <td align="right" style="color:#c51616">
+              {% else %}
+              <td align="right" style="color:#4542f4">
+              {% endif %}  
+            {% else %}
+            <td align="right" style="color:#03941b">
+            {% endif %} 
+                <strong>{{ b.load | default:'' | floatformat:2 }}</strong>
+            </td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+  </table>
+</div>
+
+{% endblock %}
+
+{% block pagination %}{% endblock %}

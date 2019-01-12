@@ -83,6 +83,13 @@ class BaseReportAdmin(JiraAdmin):
     # Число колонок в отчете
     COLUMNS = 12
 
+    # Раскраска значений
+    COLORS = {
+        'blue':  'color:#4542f4',
+        'green': 'color:#03941b',
+        'red':   'color:#c51616'
+    }
+
     # Начальный год за который имеет смысл смотреть выборку данных
     # TODO: параметр настройки
     START_YEAR = 2014
@@ -233,7 +240,8 @@ class WorklogSummaryAdmin(BaseReportAdmin):
 
         response.context_data['months'] = month_list
         response.context_data['summary'] = qs.get_workload(month_list, budget, month_norma)
-        response.context_data['budgets'] = budget_names
+        response.context_data['projects'] = budget_names
+        response.context_data['colors'] = BaseReportAdmin.COLORS
 
         return response
 
