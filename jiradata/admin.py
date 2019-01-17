@@ -10,6 +10,8 @@ from .models import (BudgetCustomField, Customfield, CustomfieldOption,
                      JiraIssue, JiraUser, Worklog, WorklogReport,
                      WorklogSummary)
 
+from timing import Timing
+
 # Register your models here.
 
 
@@ -187,7 +189,7 @@ class BaseReportAdmin(JiraAdmin):
                 qs = qs.filter(author__exact=request.user.username)
 
             issues = qs.values_list('issueid', flat=True).distinct()
-            return (BudgetCustomField(issueid).budget_id_name() for issueid in issues)
+            return set(BudgetCustomField(issueid).budget_id_name() for issueid in issues)
 
         def queryset(self, request, queryset):
              # не фильтруем, фильтр вычисляется в changelist_view()
@@ -207,15 +209,20 @@ class WorklogSummaryAdmin(BaseReportAdmin):
     
     list_filter = (
         BaseReportAdmin.YearFilter,
-        BaseReportAdmin.BudgetFilter
+       # BaseReportAdmin.BudgetFilter
     )
 
     # Отображение списка пользователей и месячной загруженности
     def changelist_view(self, request, extra_context=None):
+        timing = Timing('CLV')
+        timingsum = Timing('SUM')
+
         response = super().changelist_view(
             request,
             extra_context=extra_context
         )
+
+        timing.log()
 
         try:
             cl = response.context_data['cl']
@@ -230,18 +237,27 @@ class WorklogSummaryAdmin(BaseReportAdmin):
         # список норм рабочего времени
         month_norma = [workhours(m, m + monthdelta(1) - timedelta(days=1)) for m in month_list]
 
+        timing.log()
+
         # перечень бюджетов из набора данных или выбранный бюджет
         budget = get_selected_budget(request)
         if budget:
             budget_names = [CustomfieldOption.objects.filter(id=budget).first().customvalue]
         else:
-            issues = qs.values_list('issueid', flat=True).distinct()
-            budget_names = [BudgetCustomField(issueid).budget_name() for issueid in issues]
+            # TODO: Optimize!
+            #issues = set(qs.values_list('issueid', flat=True))
+            #budget_names = set(BudgetCustomField(issueid).budget_name() for issueid in issues)
+            budget_names = []
+
+        timing.log()
 
         response.context_data['months'] = month_list
         response.context_data['summary'] = qs.get_workload(month_list, budget, month_norma)
         response.context_data['projects'] = budget_names
         response.context_data['colors'] = BaseReportAdmin.COLORS
+
+        timing.log()
+        timingsum.log()
 
         return response
 
@@ -261,6 +277,8 @@ class WorklogReportAdmin(BaseReportAdmin):
 
     # Отображение списка бюджетов и месячной загруженности по выбранному сотруднику
     def changelist_view(self, request, extra_context=None):
+        t0 = Timing('USER')
+
         response = super().changelist_view(
             request,
             extra_context=extra_context
@@ -291,5 +309,7 @@ class WorklogReportAdmin(BaseReportAdmin):
         response.context_data['summary'], response.context_data['total'] = qs.get_workload(
             month_list, user, month_norma)
         response.context_data['norma'] = month_norma
+
+        t0.log()
 
         return response
