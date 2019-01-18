@@ -275,17 +275,7 @@ class WorklogSummary(Worklog):
             )
 
             # чтение журнала работ во фрейм
-            df = read_frame(
-                qs,
-                fieldnames=(
-                    'author',
-                    'startdate',
-                    'timeworked'
-                ),
-                index_col='issueid',
-                coerce_float=True,
-                verbose=False
-            )
+            df = df_issue_worklog(qs)
             if df.empty:
                 return ()
             
@@ -338,7 +328,7 @@ class WorklogSummary(Worklog):
                 index_col='user_name'
             )
             userdf['name'] = userdf['first_name'] + ' ' + userdf['last_name']
-            df = pd.merge(df, userdf, left_on='author', right_index=True)
+            df = df.merge(userdf, left_on='author', right_index=True)
 
             timing.log()
 
@@ -399,29 +389,14 @@ class WorklogReport(Worklog):
             )
 
             # чтение журнала работ во фрейм
-            df = read_frame(
-                qs,
-                fieldnames=(
-                    'startdate',
-                    'timeworked'
-                ),
-                index_col='issueid',
-                coerce_float=True,
-                verbose=False
-            )
-            if df.empty:
+            wdf = df_issue_worklog(qs)
+            if wdf.empty:
                 return (), None
 
             t.log()
 
-            # обогащение названиями бюджетов
-            wdf = df.merge(df_issue_budget(), left_index=True, right_index=True)
-
-            t.log()
-
             # рассчитываем требуемые для отчета колонки
-            wdf['month'] = wdf['startdate'].map(
-                lambda x: date(year=x.year, month=x.month, day=1))
+            wdf['month'] = wdf['startdate'].map(lambda x: date(year=x.year, month=x.month, day=1))
             wdf['hours'] = wdf['timeworked'] / 3600
 
             # расчет процента загрузки, если передан список норм рабочих часов по месяцам
@@ -488,9 +463,9 @@ class WorklogIssues(Worklog):
 # Вспомогательные функции
 #
 
-# получить фрейм названий бюджетов для запросов
+# получить фрейм названий бюджетов, индекс id запроса
 def df_issue_budget():
-    # перечень идентификаторов запросов и бюджетов 
+    # перечень идентификаторов запросов с назначенными бюджетами 
     df = read_frame(
         CustomfieldValue.objects.filter(customfield=BudgetCustomField.id),
         fieldnames=('stringvalue',),
@@ -498,8 +473,9 @@ def df_issue_budget():
         coerce_float=True,
         verbose=False
     )
-    df['value'] = df['stringvalue'].map(float)
-    # перечень названий бюджетов
+    df['budget_id'] = df['stringvalue'].map(float)
+    del df['stringvalue']
+    # перечень всех названий бюджетов
     opts = read_frame(
         CustomfieldOption.objects.filter(customfield=BudgetCustomField.id),
         fieldnames=('customvalue',),
@@ -508,4 +484,20 @@ def df_issue_budget():
         verbose=False
     ).rename(columns={'customvalue': 'budget'})
     
-    return df.merge(opts, left_on='value', right_index=True)
+    return df.merge(opts, left_on='budget_id', right_index=True)
+
+# получить фрейм журнала работ по заданому queryset
+def df_issue_worklog(qs):
+    df = read_frame(
+        qs,
+        fieldnames=(
+            'author',
+            'startdate',
+            'timeworked'
+        ),
+        index_col='issueid',
+        coerce_float=True,
+        verbose=False
+    )
+    # обогащение id и названиями бюджетов
+    return df.merge(df_issue_budget(), left_index=True, right_index=True)
