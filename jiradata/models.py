@@ -238,7 +238,7 @@ class CustomfieldOption(JiraModel):
         return self.customvalue
 
 #
-# Отчеты
+# Модели отчетов
 #
 
 
@@ -249,107 +249,11 @@ class WorklogSummary(Worklog):
     class Meta():
         proxy = True
         verbose_name = 'фактическая загрузка по месяцам'
-        verbose_name_plural = 'сводный отчет о фактической загрузке'
+        verbose_name_plural = 'отчет о фактической загрузке по месяцам'
         default_permissions = ('view',)
-
-    class Manager(md.Manager):
-        def get_queryset(self):
-            return WorklogSummary.QuerySet(self.model, using='jira')
-
-    # замена менеджера по умолчанию
-    objects = Manager()
-
-    class QuerySet(md.QuerySet):
-        '''
-        Дополненный класс запроса для вывода сводных затрат времени по месяцам
-        '''
-        # Формирование набора данных
-
-        def get_workload(self, month_list, budget=None, month_norma=None):
-            # фильтрация запроса по заданному диапазону
-            timing = Timing('DF')
-
-            qs = self.filter(
-                startdate__range=(
-                    month_list[0], month_list[-1] + monthdelta(1)),
-            )
-
-            # чтение журнала работ во фрейм
-            df = df_issue_worklog(qs)
-            if df.empty:
-                return ()
-            
-            timing.log()
-
-            # фильтруем, если задан ID бюджета
-            if budget:
-                # извлекаем уникальный массив задач
-                issues = df.index.unique()
-                # создаем фрейм флагов для задач с заданным ID бюджета
-                bdf = pd.DataFrame(
-                    (BudgetCustomField(issueid).budget_id() == budget for issueid in issues),
-                    index=issues,
-                    columns=('budget_flag',)
-                )
-                # объединение в один, добавление булевой маски
-                df = pd.merge(df, bdf, left_index=True, right_index=True)
-                # фильтрация по маске
-                df = df[df['budget_flag']]
-                del df['budget_flag']
-            
-            timing.log()
-
-            # рассчитываем требуемые для отчета колонки
-            df['month'] = df['startdate'].map(lambda x: date(year=x.year, month=x.month, day=1))
-            df['hours'] = df['timeworked'] / 3600
-
-            timing.log()
-
-            # расчет процента загрузки, если передан список норм рабочих часов по месяцам
-            if month_norma:
-                ndf = pd.DataFrame(month_norma, index=month_list, columns=['norma'])
-                df = pd.merge(df, ndf, left_on='month', right_index=True)
-                # расчет % загрузки по нормативу рабочих часов в месяц
-                df['load'] = df['hours'] / df['norma'] * 100
-                del df['norma']
-
-            del df['startdate']
-            del df['timeworked']
-
-            timing.log()
-
-            # обогащение реальными именами пользователей
-            userdf = read_frame(
-                JiraUser.objects.all(),
-                fieldnames=(
-                    'first_name',
-                    'last_name'
-                ),
-                index_col='user_name'
-            )
-            userdf['name'] = userdf['first_name'] + ' ' + userdf['last_name']
-            df = df.merge(userdf, left_on='author', right_index=True)
-
-            timing.log()
-
-            # агрегирование по сотрудникам и месяцам, получаем фрейм с иерархическим индексом: сотрудник, месяц
-            month_worklog = df.groupby(['name', 'month']).sum()
-
-            timing.log()
-
-            print(month_worklog)
-
-            # результат генератор последовательности словарей с полями:
-            #   - сотрудник,
-            #   - список помесячных записей о загрузке для каждого месяца из переданного списка
-            #     (отсутствующие данные заполняются нулями)
-            return (
-                {
-                    'name': name,
-                    # сбрасываем индекс по сотрудникам, переиндексируем по заданному списку месяцев, выводим в список словарей
-                    'workload': worklog.reset_index(level=0, drop=True).reindex(month_list, fill_value=0).to_dict('records')
-                } for name, worklog in month_worklog.groupby(level='name')
-            )
+        permissions = (
+            ("view_all", "Просмотр любого бюджета"),
+        )
 
 
 class WorklogReport(Worklog):
@@ -364,76 +268,6 @@ class WorklogReport(Worklog):
         permissions = (
             ("view_all", "Просмотр любого сотрудника"),
         )
-
-    class Manager(md.Manager):
-        def get_queryset(self):
-            return WorklogReport.QuerySet(self.model, using='jira')
-
-    # замена менеджера по умолчанию
-    objects = Manager()
-
-    class QuerySet(md.QuerySet):
-        '''
-        Дополненный класс запроса для вывода агрегированных затрат времени по пользователю
-        '''
-        # Формирование набора данных
-
-        def get_workload(self, month_list, user, month_norma=None):
-            t = Timing('DF')
-
-            # фильтрация запроса по времени и пользователю
-            qs = self.filter(
-                startdate__range=(
-                    month_list[0], month_list[-1] + monthdelta(1)),
-                author=user
-            )
-
-            # чтение журнала работ во фрейм
-            wdf = df_issue_worklog(qs)
-            if wdf.empty:
-                return (), None
-
-            t.log()
-
-            # рассчитываем требуемые для отчета колонки
-            wdf['month'] = wdf['startdate'].map(lambda x: date(year=x.year, month=x.month, day=1))
-            wdf['hours'] = wdf['timeworked'] / 3600
-
-            # расчет процента загрузки, если передан список норм рабочих часов по месяцам
-            if month_norma:
-                ndf = pd.DataFrame(month_norma, index=month_list, columns=['norma'])
-                wdf = pd.merge(wdf, ndf, left_on='month', right_index=True)
-                # расчет % загрузки по нормативу рабочих часов в месяц
-                wdf['load'] = wdf['hours'] / wdf['norma'] * 100
-                del wdf['norma']
-
-            del wdf['startdate']
-            del wdf['timeworked']
-
-            # агрегирование по бюджетам и месяцам, получаем фрейм с иерархическим индексом: проект, месяц
-            month_worklog = wdf.groupby(['budget', 'month']).sum()
-
-            t.log()
-
-            # результат -- кортеж:
-            # 1) генератор последовательности словарей с полями:
-            #   - бюджет,
-            #   - список помесячных записей о загрузке для каждого месяца из переданного списка
-            #     (отсутствующие данные заполняются нулями)
-            # 2) итоговая строка
-            return (
-                (
-                    {
-                        'project': p,
-                        # сбрасываем индекс по бюджетам, переиндексируем по заданному списку месяцев, выводим в список словарей
-                        'workload': worklog.reset_index(level=0, drop=True).reindex(month_list, fill_value=0).to_dict('records')
-                    } for p, worklog in month_worklog.groupby(level='budget')
-                ),
-                {
-                    # дополнительная итоговая строка
-                    'workload': month_worklog.groupby('month').sum().reindex(month_list, fill_value=0).to_dict('records')
-                }
-            )
 
 
 class WorklogIssues(Worklog):
@@ -460,9 +294,10 @@ class WorklogIssues(Worklog):
 
 
 #
-# Вспомогательные функции
+# Аналитика
 #
 
+  
 # получить фрейм названий бюджетов, индекс id запроса
 def df_issue_budget():
     # перечень идентификаторов запросов с назначенными бюджетами 
@@ -486,18 +321,139 @@ def df_issue_budget():
     
     return df.merge(opts, left_on='budget_id', right_index=True)
 
-# получить фрейм журнала работ по заданому queryset
-def df_issue_worklog(qs):
-    df = read_frame(
-        qs,
-        fieldnames=(
-            'author',
-            'startdate',
-            'timeworked'
-        ),
-        index_col='issueid',
-        coerce_float=True,
-        verbose=False
-    )
-    # обогащение id и названиями бюджетов
-    return df.merge(df_issue_budget(), left_index=True, right_index=True)
+
+class WorklogFrame:
+    '''
+    Класс для анализа данных журнала работ с помощью pandas
+    '''
+    def __init__(self, df=pd.DataFrame()):
+        self.df = df
+
+    # Загрузка фрейма из запроса с заданными колонками
+    # возвращается копия объекта с загруженными данными
+    def load(self, qs):
+        df = read_frame(
+            qs,
+            fieldnames=(
+                'author',
+                'startdate',
+                'timeworked'
+            ),
+            index_col='issueid',
+            coerce_float=True,
+            verbose=False
+        )
+        # обогащение id и названиями бюджетов
+        df = df.merge(df_issue_budget(), left_index=True, right_index=True)
+        
+        return WorklogFrame(df)
+
+    # Фильтрация по заданному значению
+    # возвращается копия объекта с отфильтрованнымми данными
+    def filter(self, budget_id=None, author=None):
+        df = self.df
+        if budget_id:
+            df = df[df['budget_id'] == budget_id]
+        if author:
+            df = df[df['author'] == author]
+        
+        return WorklogFrame(df)
+
+    # Подготовка фрейма - расчет требуемых для агрегации колонок
+    # должен быть выполнен перед агрегацией
+    def _prepare(self, month_list=None, month_norma=None):
+        df = self.df
+        # расчет статистик
+        df['month'] = df['startdate'].map(lambda x: date(year=x.year, month=x.month, day=1))
+        df['hours'] = df['timeworked'] / 3600
+        del df['startdate']
+        del df['timeworked']
+        
+        # если переданы нормы рабочего времени по месяцам
+        if month_list and month_norma:
+            df_norma = pd.DataFrame(month_norma, index=month_list, columns=['norma'])
+            df = df.merge(df_norma, left_on='month', right_index=True)
+            # расчет % загрузки по нормативу рабочих часов в месяц
+            df['load'] = df['hours'] / df['norma'] * 100
+            del df['norma']
+
+    # Обогащение реальными именами пользователей  
+    def _add_name(self):
+        userdf = read_frame(
+            JiraUser.objects.all(),
+            fieldnames=(
+                'first_name',
+                'last_name'
+            ),
+            index_col='user_name'
+        )
+        userdf['name'] = userdf['first_name'] + ' ' + userdf['last_name']
+        self.df = self.df.merge(userdf, left_on='author', right_index=True)
+    
+    # Агрегация по месяцам и пользователям
+    def aggr_month_user(self, month_list, month_norma=None):
+        # расчет статистик
+        if 'month' not in self.df.columns:
+            self._prepare(month_list, month_norma)
+
+        # добавление имен пользователей    
+        if 'name' not in self.df.columns:
+            self._add_name()
+
+        # агрегирование по сотрудникам и месяцам, получаем фрейм с иерархическим индексом: сотрудник, месяц
+        month_worklog = self.df.groupby(['name', 'month']).sum()
+
+        # результат генератор последовательности словарей с полями:
+        #   - сотрудник,
+        #   - список помесячных записей о загрузке для каждого месяца из переданного списка
+        #     (отсутствующие данные заполняются нулями)
+        return (
+            {
+                'name': name,
+                # сбрасываем индекс по сотрудникам, переиндексируем по заданному списку месяцев, выводим в список словарей
+                'workload': worklog.reset_index(level=0, drop=True).reindex(month_list, fill_value=0).to_dict('records')
+            } for name, worklog in month_worklog.groupby(level='name')
+        )
+
+    # Агрегация по месяцам и бюджетам
+    def aggr_month_budget(self, month_list, month_norma=None):
+        # расчет статистик
+        if 'month' not in self.df.columns:
+            self._prepare(month_list, month_norma)
+
+        # агрегирование по бюджетам и месяцам, получаем фрейм с иерархическим индексом: проект, месяц
+        month_worklog = self.df.groupby(['budget', 'month']).sum()
+
+        # результат -- кортеж:
+        # 1) генератор последовательности словарей с полями:
+        #   - бюджет,
+        #   - список помесячных записей о загрузке для каждого месяца из переданного списка
+        #     (отсутствующие данные заполняются нулями)
+        # 2) итоговая строка
+        return (
+            (
+                {
+                    'project': p,
+                    # сбрасываем индекс по бюджетам, переиндексируем по заданному списку месяцев, выводим в список словарей
+                    'workload': worklog.reset_index(level=0, drop=True).reindex(month_list, fill_value=0).to_dict('records')
+                } for p, worklog in month_worklog.groupby(level='budget')
+            ),
+            {
+                # дополнительная итоговая строка
+                'workload': month_worklog.groupby('month').sum().reindex(month_list, fill_value=0).to_dict('records')
+            }
+        )
+
+    # Получить список id и имен бюджетов
+    def budget_list(self):
+        df_budgets = self.df[['budget_id', 'budget']].drop_duplicates().sort_values('budget')
+        return df_budgets.values.tolist()
+    
+    # Получить список логинов и реальных имен пользователей
+    def user_list(self):
+        if 'name' not in self.df.columns:
+            self._add_name()
+
+        df_budgets = self.df[['author', 'name']].drop_duplicates().sort_values('name')
+        return df_budgets.values.tolist()
+

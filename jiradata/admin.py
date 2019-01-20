@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.utils import timezone
 from monthdelta import monthdelta, monthmod
 
@@ -8,7 +8,7 @@ from workdays.utils import workhours
 
 from .models import (BudgetCustomField, Customfield, CustomfieldOption,
                      JiraIssue, JiraUser, Worklog, WorklogReport,
-                     WorklogSummary)
+                     WorklogSummary, WorklogFrame)
 
 from timing import Timing
 
@@ -58,7 +58,7 @@ class CustomfieldAdmin(JiraAdmin):
 # Представления отчетов
 #
 
-def get_selected_year(request):
+def get_year_param(admin, request):
     '''
     Выбранный или текущий год
     '''
@@ -66,15 +66,20 @@ def get_selected_year(request):
         selected = int(request.GET.get('year'))
         year = date(selected, 1, 1).year
     except:
+        admin.message_user(request, f'Указан ошибочный год, будет использован текущий', messages.ERROR)
         year = None
     return year or timezone.now().year
 
 
-def get_selected_budget(request):
+def get_budget_param(admin, request):
     '''
     Выбранный бюджет
     '''
-    return request.GET.get('budget')
+    budget_id = request.GET.get('budget')
+    if budget_id not in request.budget_id_list:
+        admin.message_user(request, f'Указан ошибочный бюджет, выберите бюджет из фильтра', messages.ERROR)
+        return None
+    return budget_id
 
 
 class BaseReportAdmin(JiraAdmin):
@@ -138,9 +143,8 @@ class BaseReportAdmin(JiraAdmin):
                 return ()
 
         def queryset(self, request, queryset):
-            # Фильтр по выбранному году
-            year = get_selected_year(request)
-            return queryset.filter(startdate__year=year)
+            # не фильтруем, фильтр вычисляется в changelist_view()
+            return queryset
 
     # Фильтр отображения по пользователям Jira
     class UserFilter(ReportListFilter):
@@ -156,7 +160,7 @@ class BaseReportAdmin(JiraAdmin):
             # перечень для выбора доступен только с правом jiradata.view_all
             if request.user.has_perm('jiradata.view_all'):
                 # Выбор года для ограничения списка пользователей
-                year = get_selected_year(request)
+                year = get_year_param(model_admin, request)
 
                 qs = model_admin.get_queryset(
                     request).filter(startdate__year=year)
@@ -165,7 +169,7 @@ class BaseReportAdmin(JiraAdmin):
             return ()
 
         def queryset(self, request, queryset):
-             # не фильтруем, фильтр вычисляется в changelist_view()
+            # не фильтруем, фильтр вычисляется в changelist_view()
             return queryset
 
     # Фильтр отображения по бюджетам проектов
@@ -177,19 +181,20 @@ class BaseReportAdmin(JiraAdmin):
         # Parameter for the filter that will be used in the URL query.
         parameter_name = 'budget'
 
-        # формирование перечня бюджетов в зависимости от года
+        # формирование перечня бюджетов из загруженного набора данных
         def lookups(self, request, model_admin):
-            # выбор года для ограничения списка бюджетов
-            year = get_selected_year(request)
-            qs = model_admin.get_queryset(
-                request).filter(startdate__year=year)
+            worklogframe = request.worklogframe
 
-            # ограничение списка бюджетов только теми, по которым решал задачи пользователь
+            # ограничение набора данных только теми, по которым решал задачи пользователь
             if not request.user.has_perm('jiradata.view_all'):
-                qs = qs.filter(author__exact=request.user.username)
+                worklogframe = worklogframe.filter(author=request.user.username)
+            
+            # список бюджетов из набора
+            budget_list = worklogframe.budget_list()
+            # сохраняем список идентификаторов бюджетов (первые элементы списка последовательстей)
+            request.budget_id_list = list(zip(*budget_list))[0]
 
-            issues = qs.values_list('issueid', flat=True).distinct()
-            return set(BudgetCustomField(issueid).budget_id_name() for issueid in issues)
+            return budget_list
 
         def queryset(self, request, queryset):
              # не фильтруем, фильтр вычисляется в changelist_view()
@@ -209,20 +214,34 @@ class WorklogSummaryAdmin(BaseReportAdmin):
     
     list_filter = (
         BaseReportAdmin.YearFilter,
-       # BaseReportAdmin.BudgetFilter
+        BaseReportAdmin.BudgetFilter
     )
 
-    # Отображение списка пользователей и месячной загруженности
+    # Отображение списка пользователей и месячной загруженности за выбранный год
     def changelist_view(self, request, extra_context=None):
         timing = Timing('CLV')
         timingsum = Timing('SUM')
 
+        # выбранный диапазон месяцев
+        year = get_year_param(self, request)
+        month_list = [date(year, 1+i, 1) for i in range(BaseReportAdmin.COLUMNS)]
+        
+        qs = self.get_queryset(request).filter(
+            startdate__range=(month_list[0], month_list[-1] + monthdelta(1))
+        )
+
+        # загрузка и сохранение в request журнала работ за год
+        # (оптимизация для предотвращения необходимости повторной загрузки фрейма в фильтрах)
+        worklogframe = WorklogFrame().load(qs)
+        request.worklogframe = worklogframe
+
+        timing.log()
+
+        # заполнение фильтров в базовом классе
         response = super().changelist_view(
             request,
             extra_context=extra_context
         )
-
-        timing.log()
 
         try:
             cl = response.context_data['cl']
@@ -230,31 +249,22 @@ class WorklogSummaryAdmin(BaseReportAdmin):
         except (AttributeError, KeyError):
             return response
 
-        # выбранный диапазон месяцев
-        year = get_selected_year(request)
-        month_list = [date(year, 1+i, 1) for i in range(BaseReportAdmin.COLUMNS)]
-
+        # фильтрация по выбранному бюджету
+        budget = get_budget_param(self, request)
+        if budget:
+            worklogframe = worklogframe.filter(budget_id=budget)
+        
+        # перечень названий бюджетов из отфильтрованного набора данных
+        # (вторые элементы в списке последовательностей - названия бюджетов)
+        project_list = list(zip(*worklogframe.budget_list()))[1]
         # список норм рабочего времени
         month_norma = [workhours(m, m + monthdelta(1) - timedelta(days=1)) for m in month_list]
 
         timing.log()
 
-        # перечень бюджетов из набора данных или выбранный бюджет
-        budget = get_selected_budget(request)
-        if budget:
-            budget_names = [CustomfieldOption.objects.filter(id=budget).first().customvalue]
-        else:
-            # TODO: Optimize!
-            #issues = set(qs.values_list('issueid', flat=True))
-            #budget_names = set(BudgetCustomField(issueid).budget_name() for issueid in issues)
-            budget_names = []
-
-        timing.log()
-
         response.context_data['months'] = month_list
-        response.context_data['summary'] = qs.get_workload(month_list, budget, month_norma)
-        response.context_data['projects'] = budget_names
-        response.context_data['colors'] = BaseReportAdmin.COLORS
+        response.context_data['summary'] = worklogframe.aggr_month_user(month_list, month_norma)
+        response.context_data['projects'] = project_list
 
         timing.log()
         timingsum.log()
@@ -298,16 +308,22 @@ class WorklogReportAdmin(BaseReportAdmin):
             return response
 
         # выбранный диапазон месяцев
-        year = get_selected_year(request)
+        year = get_year_param(self, request)
         month_list = [date(year, 1+i, 1) for i in range(BaseReportAdmin.COLUMNS)]
            
         # список норм рабочего времени
         month_norma = [workhours(m, m + monthdelta(1) - timedelta(days=1)) for m in month_list]
 
+        # Загрузка данных и расчет статистик
+        qs = qs.filter(
+            startdate__range=(month_list[0], month_list[-1] + monthdelta(1)),
+            author=user
+        )
+        worklogframe = WorklogFrame().load(qs)
+
         response.context_data['months'] = month_list
         response.context_data['member'] = JiraUser.objects.filter(user_name=user).first()
-        response.context_data['summary'], response.context_data['total'] = qs.get_workload(
-            month_list, user, month_norma)
+        response.context_data['summary'], response.context_data['total'] = worklogframe.aggr_month_budget(month_list, month_norma)
         response.context_data['norma'] = month_norma
 
         t0.log()
