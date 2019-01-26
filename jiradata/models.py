@@ -318,6 +318,8 @@ def df_issue_budget():
         coerce_float=True,
         verbose=False
     ).rename(columns={'customvalue': 'budget'})
+    # исключение пробелов (отключено для выявления некорректных значений)
+    #opts['budget'] = opts['budget'].str.strip()
     
     return df.merge(opts, left_on='budget_id', right_index=True)
 
@@ -376,6 +378,7 @@ class WorklogFrame:
             # расчет % загрузки по нормативу рабочих часов в месяц
             df['load'] = df['hours'] / df['norma'] * 100
             del df['norma']
+            self.df = df
 
     # Обогащение реальными именами пользователей  
     def _add_name(self):

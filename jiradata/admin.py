@@ -58,27 +58,28 @@ class CustomfieldAdmin(JiraAdmin):
 # Представления отчетов
 #
 
-def get_year_param(admin, request):
+def get_year_param(request):
     '''
     Выбранный или текущий год
     '''
     try:
         selected = int(request.GET.get('year'))
         year = date(selected, 1, 1).year
-    except:
-        admin.message_user(request, f'Указан ошибочный год, будет использован текущий', messages.ERROR)
+    except (TypeError, ValueError):
         year = None
     return year or timezone.now().year
 
 
-def get_budget_param(admin, request):
+def get_budget_param(request):
     '''
     Выбранный бюджет
     '''
-    budget_id = request.GET.get('budget')
-    if budget_id not in request.budget_id_list:
-        admin.message_user(request, f'Указан ошибочный бюджет, выберите бюджет из фильтра', messages.ERROR)
-        return None
+    try:
+        budget_id = float(request.GET.get('budget'))
+        if budget_id not in request.budget_id_list:
+            budget_id = None
+    except (TypeError, ValueError):
+        budget_id = None
     return budget_id
 
 
@@ -160,7 +161,7 @@ class BaseReportAdmin(JiraAdmin):
             # перечень для выбора доступен только с правом jiradata.view_all
             if request.user.has_perm('jiradata.view_all'):
                 # Выбор года для ограничения списка пользователей
-                year = get_year_param(model_admin, request)
+                year = get_year_param(request)
 
                 qs = model_admin.get_queryset(
                     request).filter(startdate__year=year)
@@ -183,17 +184,10 @@ class BaseReportAdmin(JiraAdmin):
 
         # формирование перечня бюджетов из загруженного набора данных
         def lookups(self, request, model_admin):
-            worklogframe = request.worklogframe
-
-            # ограничение набора данных только теми, по которым решал задачи пользователь
-            if not request.user.has_perm('jiradata.view_all'):
-                worklogframe = worklogframe.filter(author=request.user.username)
-            
             # список бюджетов из набора
-            budget_list = worklogframe.budget_list()
+            budget_list = request.worklogframe.budget_list()
             # сохраняем список идентификаторов бюджетов (первые элементы списка последовательстей)
             request.budget_id_list = list(zip(*budget_list))[0]
-
             return budget_list
 
         def queryset(self, request, queryset):
@@ -223,7 +217,7 @@ class WorklogSummaryAdmin(BaseReportAdmin):
         timingsum = Timing('SUM')
 
         # выбранный диапазон месяцев
-        year = get_year_param(self, request)
+        year = get_year_param(request)
         month_list = [date(year, 1+i, 1) for i in range(BaseReportAdmin.COLUMNS)]
         
         qs = self.get_queryset(request).filter(
@@ -233,6 +227,10 @@ class WorklogSummaryAdmin(BaseReportAdmin):
         # загрузка и сохранение в request журнала работ за год
         # (оптимизация для предотвращения необходимости повторной загрузки фрейма в фильтрах)
         worklogframe = WorklogFrame().load(qs)
+        # ограничение набора данных только теми, по которым решал задачи пользователь
+        if not request.user.has_perm('jiradata.view_all'):
+            worklogframe = worklogframe.filter(author=request.user.username)
+
         request.worklogframe = worklogframe
 
         timing.log()
@@ -250,10 +248,10 @@ class WorklogSummaryAdmin(BaseReportAdmin):
             return response
 
         # фильтрация по выбранному бюджету
-        budget = get_budget_param(self, request)
+        budget = get_budget_param(request)
         if budget:
             worklogframe = worklogframe.filter(budget_id=budget)
-        
+
         # перечень названий бюджетов из отфильтрованного набора данных
         # (вторые элементы в списке последовательностей - названия бюджетов)
         project_list = list(zip(*worklogframe.budget_list()))[1]
@@ -308,7 +306,7 @@ class WorklogReportAdmin(BaseReportAdmin):
             return response
 
         # выбранный диапазон месяцев
-        year = get_year_param(self, request)
+        year = get_year_param(request)
         month_list = [date(year, 1+i, 1) for i in range(BaseReportAdmin.COLUMNS)]
            
         # список норм рабочего времени
