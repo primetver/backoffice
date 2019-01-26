@@ -78,9 +78,21 @@ def get_budget_param(request):
         budget_id = float(request.GET.get('budget'))
         if budget_id not in request.budget_id_list:
             budget_id = None
-    except (TypeError, ValueError):
+    except (AttributeError, TypeError, ValueError):
         budget_id = None
     return budget_id
+
+def get_user_param(request):
+    '''
+    Выбранный или текущий пользователь
+    '''
+    try:
+        user_id = request.GET.get('user')
+        if user_id not in request.user_id_list:
+            user_id = None
+    except (AttributeError, TypeError, ValueError):
+        user_id = None
+    return user_id or request.user.username
 
 
 class BaseReportAdmin(JiraAdmin):
@@ -158,16 +170,11 @@ class BaseReportAdmin(JiraAdmin):
 
         # формирование перечня пользователей в зависимости от прав
         def lookups(self, request, model_admin):
-            # перечень для выбора доступен только с правом jiradata.view_all
-            if request.user.has_perm('jiradata.view_all'):
-                # Выбор года для ограничения списка пользователей
-                year = get_year_param(request)
-
-                qs = model_admin.get_queryset(
-                    request).filter(startdate__year=year)
-                users = qs.values_list('author', flat=True).distinct()
-                return ((user, JiraUser.objects.filter(user_name=user).first() or user) for user in users)
-            return ()
+            # список пользователей из набора
+            user_list = request.worklogframe.user_list()
+            # сохраняем список логинов пользователей (первые элементы списка последовательстей)
+            request.user_id_list = list(zip(*user_list))[0]
+            return user_list
 
         def queryset(self, request, queryset):
             # не фильтруем, фильтр вычисляется в changelist_view()
@@ -211,10 +218,9 @@ class WorklogSummaryAdmin(BaseReportAdmin):
         BaseReportAdmin.BudgetFilter
     )
 
-    # Отображение списка пользователей и месячной загруженности за выбранный год
+    # Отображение списка пользователей и месячной загруженности по выбранному бюджету
     def changelist_view(self, request, extra_context=None):
-        timing = Timing('CLV')
-        timingsum = Timing('SUM')
+        t = Timing('JIRA-BUDGET')
 
         # выбранный диапазон месяцев
         year = get_year_param(request)
@@ -232,8 +238,6 @@ class WorklogSummaryAdmin(BaseReportAdmin):
             worklogframe = worklogframe.filter(author=request.user.username)
 
         request.worklogframe = worklogframe
-
-        timing.log()
 
         # заполнение фильтров в базовом классе
         response = super().changelist_view(
@@ -258,14 +262,12 @@ class WorklogSummaryAdmin(BaseReportAdmin):
         # список норм рабочего времени
         month_norma = [workhours(m, m + monthdelta(1) - timedelta(days=1)) for m in month_list]
 
-        timing.log()
 
         response.context_data['months'] = month_list
         response.context_data['summary'] = worklogframe.aggr_month_user(month_list, month_norma)
         response.context_data['projects'] = project_list
 
-        timing.log()
-        timingsum.log()
+        t.log()
 
         return response
 
@@ -285,45 +287,49 @@ class WorklogReportAdmin(BaseReportAdmin):
 
     # Отображение списка бюджетов и месячной загруженности по выбранному сотруднику
     def changelist_view(self, request, extra_context=None):
-        t0 = Timing('USER')
-
-        response = super().changelist_view(
-            request,
-            extra_context=extra_context
-        )
-        try:
-            # извлечение данных запроса
-            cl = response.context_data['cl']
-            qs = cl.queryset
-        except (AttributeError, KeyError, ValueError):
-            return response
-
-        # пользователь из параметров фильтра или текущий
-        user = cl.get_filters_params().get('user', request.user.username)
-
-        # проверка прав на просмотр указанного в запросе сотрудникa
-        if not request.user.has_perm('jiradata.view_all') and user != request.user.username:
-            return response
+        t = Timing('JIRA-USER')
 
         # выбранный диапазон месяцев
         year = get_year_param(request)
         month_list = [date(year, 1+i, 1) for i in range(BaseReportAdmin.COLUMNS)]
-           
+        
+        qs = self.get_queryset(request).filter(
+            startdate__range=(month_list[0], month_list[-1] + monthdelta(1))
+        )
+
+        # загрузка и сохранение в request журнала работ за год
+        # (оптимизация для предотвращения необходимости повторной загрузки фрейма в фильтрах)
+        worklogframe = WorklogFrame().load(qs)
+        # ограничение набора данных только теми, по которым решал задачи пользователь
+        if not request.user.has_perm('jiradata.view_all'):
+            worklogframe = worklogframe.filter(author=request.user.username)
+
+        request.worklogframe = worklogframe
+
+        # заполнение фильтров в базовом классе
+        response = super().changelist_view(
+            request,
+            extra_context=extra_context
+        )
+
+        try:
+            cl = response.context_data['cl']
+            qs = cl.queryset
+        except (AttributeError, KeyError):
+            return response
+
+        # фильтрация по выбранному сотруднику
+        user = get_user_param(request)
+        worklogframe = worklogframe.filter(author=user)
+
         # список норм рабочего времени
         month_norma = [workhours(m, m + monthdelta(1) - timedelta(days=1)) for m in month_list]
-
-        # Загрузка данных и расчет статистик
-        qs = qs.filter(
-            startdate__range=(month_list[0], month_list[-1] + monthdelta(1)),
-            author=user
-        )
-        worklogframe = WorklogFrame().load(qs)
-
+        
         response.context_data['months'] = month_list
         response.context_data['member'] = JiraUser.objects.filter(user_name=user).first()
         response.context_data['summary'], response.context_data['total'] = worklogframe.aggr_month_budget(month_list, month_norma)
         response.context_data['norma'] = month_norma
 
-        t0.log()
+        t.log()
 
         return response
