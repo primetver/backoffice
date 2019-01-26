@@ -156,7 +156,7 @@ class Worklog(JiraModel, BudgetCustomField):
         return issue.summary
 
     def get_issueid(self):
-        return self.issueid
+        return self.issueid.id
 
     def __str__(self):
         return f'{self.startdate:%d.%m.%Y} {self.author} {self.worklogbody or ""} {self.hours()} ч.'
