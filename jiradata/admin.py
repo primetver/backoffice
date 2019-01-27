@@ -77,9 +77,11 @@ def get_budget_param(request):
     try:
         budget_id = float(request.GET.get('budget'))
         if budget_id not in request.budget_id_list:
-            budget_id = None
-    except (AttributeError, TypeError, ValueError):
-        budget_id = None
+            budget_id = -1 # fake id
+    except TypeError:
+        return None     # none get
+    except ValueError:
+        return -1       # conversion error
     return budget_id
 
 def get_user_param(request):
@@ -217,7 +219,10 @@ class BaseReportAdmin(JiraAdmin):
             # список пользователей из набора
             user_list = request.worklogframe.user_list()
             # сохраняем список логинов пользователей (первые элементы списка последовательстей)
-            request.user_id_list = list(zip(*user_list))[0]
+            try:
+                request.user_id_list = tuple(zip(*user_list))[0]
+            except IndexError:
+                request.user_id_list = ()
             return user_list
 
         def queryset(self, request, queryset):
@@ -271,11 +276,15 @@ class WorklogSummaryAdmin(BaseReportAdmin):
         year = get_year_param(request)
         month_list = [date(year, 1+i, 1) for i in range(BaseReportAdmin.COLUMNS)]
         stop_date = get_slice_param(request)
+        last_date = month_list[-1] + monthdelta(1)
+        if stop_date and stop_date > last_date:
+            # сброс параметра, если выбран набор данных в прошлом
+            stop_date = None
         
         qs = self.get_queryset(request).filter(
             startdate__range=(
                 month_list[0],
-                stop_date if stop_date else month_list[-1] + monthdelta(1)
+                stop_date or last_date
             )
         )
 
@@ -307,7 +316,10 @@ class WorklogSummaryAdmin(BaseReportAdmin):
 
         # перечень названий бюджетов из отфильтрованного набора данных
         # (вторые элементы в списке последовательностей - названия бюджетов)
-        project_list = list(zip(*worklogframe.budget_list()))[1]
+        try:
+            project_list = tuple(zip(*worklogframe.budget_list()))[1]
+        except IndexError:
+            project_list = ()
         # список норм рабочего времени
         month_norma = calc_month_norma(month_list, stop_date=stop_date)
 
@@ -346,11 +358,15 @@ class WorklogReportAdmin(BaseReportAdmin):
         year = get_year_param(request)
         month_list = [date(year, 1+i, 1) for i in range(BaseReportAdmin.COLUMNS)]
         stop_date = get_slice_param(request)
+        last_date = month_list[-1] + monthdelta(1)
+        if stop_date and stop_date > last_date:
+            # сброс параметра, если выбран набор данных в прошлом
+            stop_date = None
         
         qs = self.get_queryset(request).filter(
             startdate__range=(
                 month_list[0],
-                stop_date if stop_date else month_list[-1] + monthdelta(1)
+                stop_date or last_date
             )
         )
 
