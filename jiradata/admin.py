@@ -4,7 +4,7 @@ from django.contrib import admin, messages
 from django.utils import timezone
 from monthdelta import monthdelta, monthmod
 
-from workdays.utils import workhours
+from workdays.utils import workhours, today, last_weekend
 
 from .models import (BudgetCustomField, Customfield, CustomfieldOption,
                      JiraIssue, JiraUser, Worklog, WorklogReport,
@@ -94,6 +94,30 @@ def get_user_param(request):
         user_id = None
     return user_id or request.user.username
 
+def get_slice_param(request):
+    '''
+    Дата окончания среза данных
+    '''
+    flag = request.GET.get('sl')
+    if flag == 'today':
+        return today()
+    elif flag == 'week':
+        return last_weekend()
+    else: 
+        return None
+
+
+def calc_month_norma(month_list, stop_date=None):
+    '''
+    Рассчитать список норм времени (опционально - по сегоднящний день)
+    '''
+    stop_date = stop_date or month_list[-1] + monthdelta(1)
+    return [ 
+        workhours(
+            min(m, stop_date),
+            min(m + monthdelta(1) - timedelta(days=1), stop_date)
+        ) for m in month_list
+    ]
 
 class BaseReportAdmin(JiraAdmin):
     '''
@@ -129,6 +153,26 @@ class BaseReportAdmin(JiraAdmin):
                     'query_string': changelist.get_query_string({self.parameter_name: lookup}),
                     'display': title,
                 }
+    
+    # Фильтр среза данных
+    class SliceFilter(admin.SimpleListFilter):
+        # Human-readable title which will be displayed in the
+        # right admin sidebar just above the filter options.
+        title = 'Срез данных'
+
+        # Parameter for the filter that will be used in the URL query.
+        parameter_name = 'sl'
+
+        def lookups(self, request, model_admin):
+            return (
+                ('week', 'Предыдущая неделя'),
+                ('today', 'Сегодня')
+            )
+
+        def queryset(self, request, queryset):
+            # не фильтруем, фильтр вычисляется в changelist_view()
+            return queryset
+
 
     # Фильтр отображения по годам
     class YearFilter(ReportListFilter):
@@ -214,6 +258,7 @@ class WorklogSummaryAdmin(BaseReportAdmin):
     change_list_template = 'admin/workload_summary_change_list.html'
     
     list_filter = (
+        BaseReportAdmin.SliceFilter,
         BaseReportAdmin.YearFilter,
         BaseReportAdmin.BudgetFilter
     )
@@ -225,9 +270,13 @@ class WorklogSummaryAdmin(BaseReportAdmin):
         # выбранный диапазон месяцев
         year = get_year_param(request)
         month_list = [date(year, 1+i, 1) for i in range(BaseReportAdmin.COLUMNS)]
+        stop_date = get_slice_param(request)
         
         qs = self.get_queryset(request).filter(
-            startdate__range=(month_list[0], month_list[-1] + monthdelta(1))
+            startdate__range=(
+                month_list[0],
+                stop_date if stop_date else month_list[-1] + monthdelta(1)
+            )
         )
 
         # загрузка и сохранение в request журнала работ за год
@@ -260,12 +309,15 @@ class WorklogSummaryAdmin(BaseReportAdmin):
         # (вторые элементы в списке последовательностей - названия бюджетов)
         project_list = list(zip(*worklogframe.budget_list()))[1]
         # список норм рабочего времени
-        month_norma = [workhours(m, m + monthdelta(1) - timedelta(days=1)) for m in month_list]
+        month_norma = calc_month_norma(month_list, stop_date=stop_date)
 
 
         response.context_data['months'] = month_list
         response.context_data['summary'] = worklogframe.aggr_month_user(month_list, month_norma)
         response.context_data['projects'] = project_list
+        response.context_data['norma'] = month_norma
+        response.context_data['slice'] = stop_date
+        response.context_data['year'] = year
 
         t.log()
 
@@ -281,6 +333,7 @@ class WorklogReportAdmin(BaseReportAdmin):
     change_list_template = 'admin/workload_user_change_list.html'
 
     list_filter = (
+        BaseReportAdmin.SliceFilter,
         BaseReportAdmin.YearFilter,
         BaseReportAdmin.UserFilter
     )
@@ -292,9 +345,13 @@ class WorklogReportAdmin(BaseReportAdmin):
         # выбранный диапазон месяцев
         year = get_year_param(request)
         month_list = [date(year, 1+i, 1) for i in range(BaseReportAdmin.COLUMNS)]
+        stop_date = get_slice_param(request)
         
         qs = self.get_queryset(request).filter(
-            startdate__range=(month_list[0], month_list[-1] + monthdelta(1))
+            startdate__range=(
+                month_list[0],
+                stop_date if stop_date else month_list[-1] + monthdelta(1)
+            )
         )
 
         # загрузка и сохранение в request журнала работ за год
@@ -323,12 +380,16 @@ class WorklogReportAdmin(BaseReportAdmin):
         worklogframe = worklogframe.filter(author=user)
 
         # список норм рабочего времени
-        month_norma = [workhours(m, m + monthdelta(1) - timedelta(days=1)) for m in month_list]
+        month_norma = calc_month_norma(month_list, stop_date=stop_date)
+
+        print(month_norma)
         
         response.context_data['months'] = month_list
         response.context_data['member'] = JiraUser.objects.filter(user_name=user).first()
         response.context_data['summary'], response.context_data['total'] = worklogframe.aggr_month_budget(month_list, month_norma)
         response.context_data['norma'] = month_norma
+        response.context_data['slice'] = stop_date
+        response.context_data['year'] = year
 
         t.log()
 

@@ -37,10 +37,12 @@ QUARTES = [
 def today():
     return timezone.now().date()
 
+def last_weekend():
+    date = today()
+    return date - timedelta(days=date.weekday()+1)
 
 def tomorrow():
     return today() + timedelta(days=1)
-
 
 def is_holiday(date):
     holiday = SpecialDay.objects.filter(date=date).first()
