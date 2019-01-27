@@ -40,7 +40,7 @@
     </thead>
     <tbody>
         {% for row in summary %}
-        <tr class="{% cycle 'row1' 'row2' %}">
+        <tr class="{% cycle 'row1' 'row2' as rowcolors %}">
             <td> {{ row.name }} </td>
             {% for b in row.workload %}
             <td align="right">
@@ -60,6 +60,15 @@
             {% endfor %}
         </tr>
         {% endfor %}
+        <tr class="{% cycle rowcolors %}">
+          <td><strong> НОРМА: </strong></td>
+          {% for n in norma %}
+          <td align="right">
+              {{ n | default:'' | floatformat:2 }}
+          </td>
+          <td></td>
+          {% endfor %}
+      </tr>
       </tbody>
   </table>
 </div>
