@@ -156,6 +156,7 @@ class Worklog(JiraModel, BudgetCustomField):
         return issue.summary
 
     def get_issueid(self):
+        # pylint: disable=no-member        
         return self.issueid.id
 
     def __str__(self):
@@ -459,4 +460,8 @@ class WorklogFrame:
 
         df_budgets = self.df[['author', 'name']].drop_duplicates().sort_values('name')
         return df_budgets.values.tolist()
+
+    # Число строк
+    def rows(self):
+        return self.df.shape[0]
 

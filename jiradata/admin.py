@@ -270,7 +270,7 @@ class WorklogSummaryAdmin(BaseReportAdmin):
 
     # Отображение списка пользователей и месячной загруженности по выбранному бюджету
     def changelist_view(self, request, extra_context=None):
-        t = Timing('JIRA-BUDGET')
+        t = Timing('WorklogSummary')
 
         # выбранный диапазон месяцев
         year = get_year_param(request)
@@ -296,6 +296,7 @@ class WorklogSummaryAdmin(BaseReportAdmin):
             worklogframe = worklogframe.filter(author=request.user.username)
 
         request.worklogframe = worklogframe
+        rows = worklogframe.rows() 
 
         # заполнение фильтров в базовом классе
         response = super().changelist_view(
@@ -323,6 +324,7 @@ class WorklogSummaryAdmin(BaseReportAdmin):
         # список норм рабочего времени
         month_norma = calc_month_norma(month_list, stop_date=stop_date)
 
+        seconds = t.step()
 
         response.context_data['months'] = month_list
         response.context_data['summary'] = worklogframe.aggr_month_user(month_list, month_norma)
@@ -330,8 +332,7 @@ class WorklogSummaryAdmin(BaseReportAdmin):
         response.context_data['norma'] = month_norma
         response.context_data['slice'] = stop_date
         response.context_data['year'] = year
-
-        t.log()
+        response.context_data['stat'] = f'{rows} строк обработано за {seconds:.2} c'
 
         return response
 
@@ -352,7 +353,7 @@ class WorklogReportAdmin(BaseReportAdmin):
 
     # Отображение списка бюджетов и месячной загруженности по выбранному сотруднику
     def changelist_view(self, request, extra_context=None):
-        t = Timing('JIRA-USER')
+        t = Timing('WorklogReport')
 
         # выбранный диапазон месяцев
         year = get_year_param(request)
@@ -378,6 +379,7 @@ class WorklogReportAdmin(BaseReportAdmin):
             worklogframe = worklogframe.filter(author=request.user.username)
 
         request.worklogframe = worklogframe
+        rows = worklogframe.rows() 
 
         # заполнение фильтров в базовом классе
         response = super().changelist_view(
@@ -398,7 +400,7 @@ class WorklogReportAdmin(BaseReportAdmin):
         # список норм рабочего времени
         month_norma = calc_month_norma(month_list, stop_date=stop_date)
 
-        print(month_norma)
+        seconds = t.step()
         
         response.context_data['months'] = month_list
         response.context_data['member'] = JiraUser.objects.filter(user_name=user).first()
@@ -406,7 +408,6 @@ class WorklogReportAdmin(BaseReportAdmin):
         response.context_data['norma'] = month_norma
         response.context_data['slice'] = stop_date
         response.context_data['year'] = year
-
-        t.log()
+        response.context_data['stat'] = f'{rows} строк обработано за {seconds:.2} c'
 
         return response

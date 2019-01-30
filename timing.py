@@ -4,11 +4,14 @@ class Timing:
 
     def __init__(self, name=None):
         self.t = time.time()
-        self.step = 1
-        self.name = name
+        self.steps = 1
+        self.name = name or 'Timing'
 
-    def log(self):
+    def step(self, log=False):
         t2 = time.time()
-        print(f'{self.name}: Шаг {self.step} занял {t2 - self.t}')
+        elapse = t2 - self.t
+        if log:
+            print(f'{self.name}: Шаг {self.steps} занял {elapse}')
         self.t = t2
-        self.step += 1
+        self.steps += 1
+        return elapse
