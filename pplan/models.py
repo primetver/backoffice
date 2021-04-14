@@ -414,7 +414,7 @@ class ProjectMember(md.Model):
     def percent(self):
         try:
             return self.volume() / workdays(self.start_date(), self.finish_date()) * 100
-        except TypeError:
+        except (TypeError, ZeroDivisionError):
             return 0
     percent.short_description = 'Загрузка, %'
 
